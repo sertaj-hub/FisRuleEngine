@@ -11,10 +11,8 @@ public class DialectConfig {
     public Dialect dialect(FisreProperties props) {
         return switch (props.dbVendor().toLowerCase()) {
             case "postgresql" -> new PostgresDialect();
-            case "mysql" -> new MySqlDialect();
-            case "oracle" -> new OracleDialect();
             default -> throw new IllegalStateException(
-                    "Unsupported fisre.db-vendor '" + props.dbVendor() + "' (expected postgresql, mysql or oracle)");
+                    "Unsupported fisre.db-vendor '" + props.dbVendor() + "' (only postgresql is supported for now)");
         };
     }
 }

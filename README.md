@@ -1,37 +1,30 @@
 # FIS Rule Engine
 
-Batch transaction-monitoring (AML) detection for card, loan and deposit accounts (US/BSA).
-Runs on PostgreSQL, Oracle or MySQL, chosen by configuration.
+Batch transaction-monitoring (AML) detection for card, loan and deposit accounts (US/BSA). PostgreSQL for now (ADR-0002).
 
 ```
-bank ETL ─► stg (customer, account, txn) ─[promote batch]─► mst ─[detection batch: Phase 2]─► aml (alerts)
+bank ETL ─► stg (customer, account, txn, tagged batch_id) ─[promote batch]─► mst ─[detection: Phase 2]─► aml (alerts)
 ```
 
-Status: **Phase 0-1 done** (foundation, schemas, validation and promotion). Next: rule framework and first rules.
+A **batch** is one business date and succeeds or fails as a whole. On success its stg rows are deleted; on failure
+fix stg and `reopen`, or `clean` and reload under a new batch id. Protocol: [`specs/data-contract/batch-protocol.md`](specs/data-contract/batch-protocol.md).
+
+Status: Phases 0, 1 and 1b done (foundation, schemas, batch promotion). Next: rule framework (Phase 2) and rules (Phase 3).
 Specs: [`specs/`](specs/README.md). Decisions: [`specs/adr/`](specs/adr).
 
 ## Run
 
 ```bash
-# 1. a database with schemas stg, mst, aml (see ops/db/<vendor>/init.sql, or docker compose up postgres)
-# 2. configure and run
-export FISRE_DB_VENDOR=postgresql            # postgresql | mysql | oracle
-export FISRE_DB_URL=jdbc:postgresql://localhost:5432/fisre
-export FISRE_DB_USER=fisre FISRE_DB_PASSWORD=fisre
+docker compose up -d postgres            # or any PostgreSQL with schemas stg, mst, aml (ops/db/postgresql/)
+export FISRE_DB_URL=jdbc:postgresql://localhost:5432/fisre FISRE_DB_USER=fisre FISRE_DB_PASSWORD=fisre
 mvn -q -pl fisre-engine package -DskipTests
-FISRE_JOB=promote java -jar fisre-engine/target/fisre-engine-0.1.0-SNAPSHOT.jar   # migrates, then promotes
+# migrates the schema, then runs the job: promote | clean | reopen   (none = migrate only)
+FISRE_JOB=promote FISRE_BATCH_ID=2026-09-30-01 java -jar fisre-engine/target/fisre-engine-0.1.0-SNAPSHOT.jar
 ```
 
-JDBC URLs: MySQL `jdbc:mysql://host:3306/aml` · Oracle `jdbc:oracle:thin:@//host:1521/SERVICE`.
-Schema names: `FISRE_SCHEMA_STG|MST|AML`.
+Schema names: `FISRE_SCHEMA_STG|MST|AML`. Exit code is non-zero when a batch fails.
 
 ## Test
 
-`mvn verify` runs unit tests, the spec gate and database integration tests against the configured database.
-CI runs the same tests on all three vendors.
-
-| Vendor | Verified |
-|---|---|
-| PostgreSQL 16 | locally and CI |
-| MySQL 8 | locally and CI |
-| Oracle 23 | CI only (first run pending; not yet run anywhere) |
+`mvn verify` runs unit tests, the spec gate and database integration tests against the PostgreSQL in `FISRE_DB_*`
+(default `localhost:5432/fisre`, user and password `fisre`). After changing migrations on a dev database, recreate the three schemas.

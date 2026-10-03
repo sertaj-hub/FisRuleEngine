@@ -13,8 +13,8 @@ public interface Dialect {
 
     /**
      * Insert-or-update every row of {@code source} into {@code target}, matching on the entity key.
-     * {@code source} is a SELECT whose columns are exactly {@link Entity#columns()} in order,
-     * with unique keys.
+     * {@code source} is a SELECT of {@link Entity#columns()} plus {@code batch_id},
+     * with unique keys. Named parameters (e.g. :batch) in it are bound by the caller.
      */
     String upsert(String target, Entity entity, String source);
 }

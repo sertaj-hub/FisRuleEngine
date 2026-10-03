@@ -1,8 +1,8 @@
 # Entities
 
 Three entities per ADR-0003. The same business columns exist in `stg` and `mst`.
-`stg` adds `stg_id`, `load_id`, `rec_status` (NEW, PROCESSED, REJECTED) and `reject_reason`.
-`mst` adds `load_id`, `created_ts`, `updated_ts`. Source of truth for types: `db/migration/<vendor>/`.
+`stg` adds `stg_id`, `batch_id` (required) and `reject_reason`.
+`mst` adds `batch_id` (the batch that last wrote the row), `created_ts`, `updated_ts`. Source of truth for types: `db/migration/<vendor>/`.
 
 **customer** (`customer_id`): `customer_type`, `full_name`, `birth_or_formation_dt`, `country_code`, `state_code`, `customer_since`, `status`
 

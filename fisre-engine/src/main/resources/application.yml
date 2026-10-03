@@ -1,7 +1,8 @@
-# One artifact, any supported database: choose with FISRE_DB_VENDOR + FISRE_DB_URL.
+# PostgreSQL is the only vendor built and tested for now (ADR-0002); the Dialect seam keeps others possible.
 fisre:
-  db-vendor: ${FISRE_DB_VENDOR:postgresql}   # postgresql | mysql | oracle
-  job: ${FISRE_JOB:none}                     # none | promote
+  db-vendor: ${FISRE_DB_VENDOR:postgresql}
+  job: ${FISRE_JOB:none}                     # none | promote | clean | reopen
+  batch-id: ${FISRE_BATCH_ID:}               # required by promote, clean, reopen
   schemas:                                   # logical schema -> physical schema/database/user
     stg: ${FISRE_SCHEMA_STG:stg}
     mst: ${FISRE_SCHEMA_MST:mst}
@@ -15,7 +16,7 @@ spring:
     username: ${FISRE_DB_USER:fisre}
     password: ${FISRE_DB_PASSWORD:fisre}
   flyway:
-    locations: classpath:db/migration/common,classpath:db/migration/${fisre.db-vendor}
+    locations: classpath:db/migration
     default-schema: ${fisre.schemas.aml}
     placeholders:
       stg: ${fisre.schemas.stg}
