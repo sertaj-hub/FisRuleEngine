@@ -1,14 +1,26 @@
 # PostgreSQL is the only vendor built and tested for now (ADR-0002); the Dialect seam keeps others possible.
 fisre:
   db-vendor: ${FISRE_DB_VENDOR:postgresql}
-  job: ${FISRE_JOB:none}                     # none | promote | clean | reopen | load-rules | detect
+  job: ${FISRE_JOB:none}                     # none | promote | promote-loaded | clean | reopen | load-rules | detect | retain | generate
   batch-id: ${FISRE_BATCH_ID:}               # required by promote, clean, reopen
-  business-date: ${FISRE_BUSINESS_DATE:}     # YYYY-MM-DD, required by detect
+  business-date: ${FISRE_BUSINESS_DATE:}     # YYYY-MM-DD, required by detect, retain, generate
   rules-dir: ${FISRE_RULES_DIR:specs/rules}  # rule specs read by load-rules
   schemas:                                   # logical schema -> physical schema/database/user
     stg: ${FISRE_SCHEMA_STG:stg}
     mst: ${FISRE_SCHEMA_MST:mst}
     aml: ${FISRE_SCHEMA_AML:aml}
+  tuning:
+    posting-offset-days: ${FISRE_POSTING_OFFSET_DAYS:1}     # batch for date D carries transactions posted on D-1
+    duplicate-lookback-days: ${FISRE_DUPLICATE_LOOKBACK_DAYS:3}
+    retention-months: ${FISRE_RETENTION_MONTHS:13}
+    max-evidence-txns: ${FISRE_MAX_EVIDENCE_TXNS:200}
+    detect-parallelism: ${FISRE_DETECT_PARALLELISM:4}
+    parallelism: ${FISRE_PARALLELISM:2}                      # concurrent batches in promote-loaded
+    reject-sample-size: ${FISRE_REJECT_SAMPLE_SIZE:100}
+  bench:
+    txns: ${FISRE_BENCH_TXNS:1000}
+    accounts: ${FISRE_BENCH_ACCOUNTS:100}
+    reference: ${FISRE_BENCH_REFERENCE:true}                 # include customers and accounts in the generated batch
 
 spring:
   main:

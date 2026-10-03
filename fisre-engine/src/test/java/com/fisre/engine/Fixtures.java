@@ -4,9 +4,11 @@ import com.fisre.engine.config.FisreProperties;
 import java.math.BigDecimal;
 import java.sql.Date;
 import java.sql.Timestamp;
+import java.time.LocalDate;
+import java.util.List;
 import org.springframework.jdbc.core.JdbcTemplate;
 
-/** Test data helper: resets every table and inserts master data directly (as if a batch had been promoted). */
+/** Test data helper: resets every table (including partitions) and inserts master data directly. */
 public class Fixtures {
 
     private final JdbcTemplate jdbc;
@@ -19,17 +21,53 @@ public class Fixtures {
         this.aml = props.schemas().aml();
     }
 
+    public static FisreProperties props(String job, String batchId, String businessDate) {
+        return new FisreProperties("postgresql", job, batchId, businessDate, "specs/rules",
+                new FisreProperties.Schemas("stg", "mst", "aml"), FisreProperties.Tuning.defaults(), FisreProperties.Bench.defaults());
+    }
+
+    /** Names of the partitions of a partitioned table. */
+    public List<String> partitions(String schema, String table) {
+        return jdbc.queryForList("SELECT c.relname FROM pg_inherits i JOIN pg_class c ON c.oid = i.inhrelid JOIN pg_class p ON p.oid = i.inhparent"
+                + " JOIN pg_namespace n ON n.oid = p.relnamespace WHERE n.nspname = ? AND p.relname = ? ORDER BY 1", String.class, schema, table);
+    }
+
+    public boolean exists(String qualifiedTable) {
+        return Boolean.TRUE.equals(jdbc.queryForObject("SELECT to_regclass(?) IS NOT NULL", Boolean.class, qualifiedTable));
+    }
+
     public void resetAll() {
-        jdbc.execute("DROP TRIGGER IF EXISTS fail_txn ON " + mst + ".txn");
-        for (String t : new String[] {aml + ".alert", aml + ".rule_run", aml + ".rule", mst + ".txn", mst + ".account", mst + ".customer",
-                stg + ".txn", stg + ".account", stg + ".customer", aml + ".load_batch_entity", aml + ".load_batch"}) {
+        jdbc.execute("DROP TRIGGER IF EXISTS fail_acct ON " + mst + ".account");
+        for (String t : new String[] {aml + ".alert", aml + ".rule_run", aml + ".rule"}) {
+            jdbc.update("DELETE FROM " + t);
+        }
+        for (String p : partitions(mst, "txn")) {
+            jdbc.execute("DROP TABLE " + mst + "." + p);
+        }
+        for (String leftover : jdbc.queryForList("SELECT table_name FROM information_schema.tables WHERE table_schema = ? AND table_name LIKE 'txn\\_new\\_%'", String.class, mst)) {
+            jdbc.execute("DROP TABLE " + mst + "." + leftover);
+        }
+        jdbc.update("DELETE FROM " + mst + ".account");
+        jdbc.update("DELETE FROM " + mst + ".customer");
+        for (String table : new String[] {"customer", "account", "txn"}) {
+            for (String p : partitions(stg, table)) {
+                jdbc.execute("DROP TABLE " + stg + "." + p);
+            }
+        }
+        for (String t : new String[] {aml + ".load_reject", aml + ".load_batch_entity", aml + ".load_batch"}) {
             jdbc.update("DELETE FROM " + t);
         }
     }
 
-    /** A promoted batch for the date, so detection is allowed to run. */
-    public void liveBatch(String batchId, String date) {
-        jdbc.update("INSERT INTO " + aml + ".load_batch (batch_id, business_date, status) VALUES (?, ?, 'CLEANED')", batchId, Date.valueOf(date));
+    /** A promoted batch for the business date, so detection is allowed to run. */
+    public void liveBatch(String batchId, String businessDate) {
+        jdbc.update("INSERT INTO " + aml + ".load_batch (batch_id, business_date, status) VALUES (?, ?, 'CLEANED')", batchId, Date.valueOf(businessDate));
+    }
+
+    public void ensurePartition(String date) {
+        LocalDate d = LocalDate.parse(date);
+        jdbc.execute("CREATE TABLE IF NOT EXISTS " + mst + ".txn_" + date.replace("-", "") + " PARTITION OF " + mst + ".txn FOR VALUES FROM ('"
+                + d + "') TO ('" + d.plusDays(1) + "')");
     }
 
     public void customer(String id) {
@@ -45,6 +83,7 @@ public class Fixtures {
     }
 
     public void txn(String id, String accountId, String type, String direction, BigDecimal amount, String date, String time) {
+        ensurePartition(date);
         jdbc.update("INSERT INTO " + mst + ".txn (transaction_id, account_id, txn_ts, posting_date, txn_type, direction, amount, currency, batch_id)"
                 + " VALUES (?, ?, ?, ?, ?, ?, ?, 'USD', 'FIX')", id, accountId, Timestamp.valueOf(date + " " + time + ":00"),
                 Date.valueOf(date), type, direction, amount);

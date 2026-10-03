@@ -14,14 +14,14 @@ config:
   then_min_pct_of_first: 50
 tests:
   - name: payoff 40 days after disbursement
-    business_date: 2026-09-30
+    as_of: 2026-09-30
     accounts: [{id: L1, product: LOAN}]
     txns:
       - {id: T1, account: L1, type: LOAN_DISBURSEMENT, direction: CREDIT, amount: 20000, date: 2026-08-21}
       - {id: T2, account: L1, type: LOAN_PAYOFF, direction: CREDIT, amount: 20500, date: 2026-09-30}
     expect_alerts: [L1]
   - name: payoff after a year, or a small payment instead of a payoff
-    business_date: 2026-09-30
+    as_of: 2026-09-30
     accounts: [{id: L1, product: LOAN}, {id: L2, product: LOAN}]
     txns:
       - {id: T1, account: L1, type: LOAN_DISBURSEMENT, direction: CREDIT, amount: 20000, date: 2025-09-01}

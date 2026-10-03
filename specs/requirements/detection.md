@@ -11,4 +11,8 @@
 | REQ-DET-005 | With `suppress_days` = N, an account that hit the same rule within the previous N days gets no new alert. | Implemented |
 | REQ-DET-006 | A rule that fails is recorded as FAILED in `aml.rule_run` and does not stop the other rules; the job exits non-zero at the end. | Implemented |
 | REQ-DET-007 | `aml.rule_run` records, per rule and run, the business date, status, timings and alerts created. | Implemented |
-| REQ-DET-008 | Detection handles 10M transactions per day within the agreed window; transaction links per alert are capped. | Planned |
+| REQ-DET-008 | Detection handles 10M transactions per day within the agreed window (measured by the benchmark). | Planned |
+| REQ-DET-009 | Active rules run concurrently, up to `detect-parallelism`; each rule is its own transaction, and results do not depend on the parallelism. | Implemented |
+| REQ-DET-010 | A rule's queries read only the master partitions inside its window (partition pruning), and candidate accounts are found from the as-of day's partition only. | Implemented |
+| REQ-DET-011 | Transactions linked to an alert are capped at `max-evidence-txns` (default 200) per alert; the evidence JSON still carries the true totals. | Implemented |
+| REQ-DET-012 | A rule's windows end on the posting day, which is the business date minus `posting-offset-days`; alerts carry the business date. | Implemented |

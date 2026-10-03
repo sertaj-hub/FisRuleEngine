@@ -38,7 +38,7 @@ class RuleSpecIT {
     @Autowired DetectionService detection;
 
     @TestFactory
-    @Req({"REQ-RULE-005", "REQ-RULE-006", "REQ-RULE-007", "REQ-RULE-008", "REQ-RULE-009"})
+    @Req({"REQ-RULE-005", "REQ-RULE-006", "REQ-RULE-007", "REQ-RULE-008", "REQ-RULE-009", "REQ-RULE-011"})
     Stream<DynamicTest> everyRuleSpecScenarioPasses() throws IOException {
         List<DynamicTest> tests = new ArrayList<>();
         Set<String> templatesUsed = new TreeSet<>();
@@ -71,8 +71,9 @@ class RuleSpecIT {
     private void run(RuleSpec spec, JsonNode sc) {
         Fixtures fx = new Fixtures(jdbc, props);
         fx.resetAll();
-        String date = sc.get("business_date").asText();
-        fx.liveBatch("B-" + date, date);
+        String asOf = sc.get("as_of").asText();
+        LocalDate businessDate = LocalDate.parse(asOf).plusDays(props.tuning().postingOffsetDays());
+        fx.liveBatch("B-" + businessDate, businessDate.toString());
         for (JsonNode a : sc.path("accounts")) {
             String id = a.get("id").asText();
             fx.account(id, a.get("product").asText(), a.path("customer").asText("C-" + id), a.path("open_date").asText("2020-01-01"));
@@ -83,7 +84,7 @@ class RuleSpecIT {
         }
         loader.load(List.of(spec), spec.sourceFile());
 
-        DetectionService.Result r = detection.detect(LocalDate.parse(date));
+        DetectionService.Result r = detection.detect(businessDate);
 
         assertThat(r.rulesFailed()).isZero();
         List<String> alerted = jdbc.queryForList("SELECT account_id FROM " + props.schemas().aml() + ".alert WHERE rule_code = ?", String.class, spec.code());

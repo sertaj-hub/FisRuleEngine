@@ -12,7 +12,7 @@ config:
   min_sum: 10000
 tests:
   - name: three sub-limit deposits over four days
-    business_date: 2026-09-30
+    as_of: 2026-09-30
     accounts: [{id: A1, product: DEPOSIT}]
     txns:
       - {id: T1, account: A1, type: CASH_DEPOSIT, direction: CREDIT, amount: 9500, date: 2026-09-27}
@@ -20,7 +20,7 @@ tests:
       - {id: T3, account: A1, type: CASH_DEPOSIT, direction: CREDIT, amount: 8000, date: 2026-09-30}
     expect_alerts: [A1]
   - name: only two deposits, or deposits outside the window, or small ones
-    business_date: 2026-09-30
+    as_of: 2026-09-30
     accounts: [{id: A1, product: DEPOSIT}, {id: A2, product: DEPOSIT}, {id: A3, product: DEPOSIT}]
     txns:
       - {id: T1, account: A1, type: CASH_DEPOSIT, direction: CREDIT, amount: 9500, date: 2026-09-29}
@@ -33,10 +33,18 @@ tests:
       - {id: T8, account: A3, type: CASH_DEPOSIT, direction: CREDIT, amount: 1000, date: 2026-09-30}
     expect_alerts: []
   - name: card accounts are out of scope
-    business_date: 2026-09-30
+    as_of: 2026-09-30
     accounts: [{id: A1, product: CARD}]
     txns:
       - {id: T1, account: A1, type: CASH_DEPOSIT, direction: CREDIT, amount: 9500, date: 2026-09-28}
       - {id: T2, account: A1, type: CASH_DEPOSIT, direction: CREDIT, amount: 9500, date: 2026-09-29}
       - {id: T3, account: A1, type: CASH_DEPOSIT, direction: CREDIT, amount: 9500, date: 2026-09-30}
+    expect_alerts: []
+  - name: the pattern is in the window but there is no new cash deposit on the as-of day
+    as_of: 2026-09-30
+    accounts: [{id: A1, product: DEPOSIT}]
+    txns:
+      - {id: T1, account: A1, type: CASH_DEPOSIT, direction: CREDIT, amount: 9500, date: 2026-09-26}
+      - {id: T2, account: A1, type: CASH_DEPOSIT, direction: CREDIT, amount: 9000, date: 2026-09-27}
+      - {id: T3, account: A1, type: CASH_DEPOSIT, direction: CREDIT, amount: 8000, date: 2026-09-28}
     expect_alerts: []

@@ -4,49 +4,61 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.fisre.engine.Fixtures;
 import com.fisre.engine.config.FisreProperties;
 import com.fisre.engine.spec.Req;
 import java.math.BigDecimal;
 import java.sql.Date;
 import java.sql.Timestamp;
+import java.time.LocalDate;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.dao.DataAccessException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.JdbcTemplate;
 
-/** Runs against the local PostgreSQL configured by FISRE_DB_* (see README). */
+/**
+ * Runs against the local PostgreSQL configured by FISRE_DB_* (see README).
+ * Business date D1 = 2026-10-01, so its transactions are posted on 2026-09-30 (posting offset 1).
+ */
 @SpringBootTest
 class BatchIT {
 
-    static final String D1 = "2026-09-30";
-    static final String D2 = "2026-10-01";
+    static final String D1 = "2026-10-01";
+    static final String D2 = "2026-10-02";
 
     @Autowired JdbcTemplate jdbc;
     @Autowired BatchService service;
     @Autowired FisreProperties props;
 
     String stg, mst, aml;
+    Fixtures fx;
+    final Map<String, String> businessDate = new HashMap<>();
 
     @BeforeEach
     void clean() {
         stg = props.schemas().stg();
         mst = props.schemas().mst();
         aml = props.schemas().aml();
-        jdbc.execute("DROP TRIGGER IF EXISTS fail_txn ON " + mst + ".txn");
-        for (String t : List.of(mst + ".txn", mst + ".account", mst + ".customer", stg + ".txn", stg + ".account",
-                stg + ".customer", aml + ".load_batch_entity", aml + ".load_batch")) {
-            jdbc.update("DELETE FROM " + t);
-        }
+        fx = new Fixtures(jdbc, props);
+        fx.resetAll();
+        businessDate.clear();
     }
 
     // ---- fixtures -------------------------------------------------------------------------------
 
     void batch(String id, String date, String status) {
-        jdbc.update("INSERT INTO " + aml + ".load_batch (batch_id, business_date, status) VALUES (?, ?, ?)",
-                id, Date.valueOf(date), status);
+        jdbc.update("INSERT INTO " + aml + ".load_batch (batch_id, business_date, status) VALUES (?, ?, ?)", id, Date.valueOf(date), status);
+        businessDate.put(id, date);
+    }
+
+    String postingOf(String batchId) {
+        return LocalDate.parse(businessDate.get(batchId)).minusDays(1).toString();
     }
 
     void customer(String b, String id, String type, String name) {
@@ -59,13 +71,17 @@ class BatchIT {
                 + " VALUES (?, ?, ?, ?, ?, ?, 'USD')", b, id, customerId, product, status, Date.valueOf("2020-01-15"));
     }
 
-    void txn(String b, String id, String accountId, String type, String direction, String amount) {
+    void txnOn(String b, String posting, String id, String accountId, String type, String direction, String amount) {
         jdbc.update("INSERT INTO " + stg + ".txn (batch_id, transaction_id, account_id, txn_ts, posting_date, txn_type, direction, amount, currency)"
-                + " VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'USD')", b, id, accountId, Timestamp.valueOf("2026-09-30 10:15:00"),
-                Date.valueOf("2026-09-30"), type, direction, new BigDecimal(amount));
+                + " VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'USD')", b, id, accountId, Timestamp.valueOf(posting + " 10:15:00"),
+                Date.valueOf(posting), type, direction, new BigDecimal(amount));
     }
 
-    /** A valid batch: one customer, one account, the given transactions (id to amount). */
+    void txn(String b, String id, String accountId, String type, String direction, String amount) {
+        txnOn(b, postingOf(b), id, accountId, type, direction, amount);
+    }
+
+    /** A valid LOADED batch: customer C1, account A1, and the given transactions (id, amount, ...). */
     void validBatch(String id, String date, String... txnIdAmount) {
         batch(id, date, "LOADED");
         customer(id, "C1", "INDIVIDUAL", "Ada Lovelace");
@@ -83,12 +99,23 @@ class BatchIT {
         return jdbc.queryForObject("SELECT status FROM " + aml + ".load_batch WHERE batch_id = ?", String.class, id);
     }
 
-    String reason(String table, String keyCol, String key) {
-        return jdbc.queryForObject("SELECT reject_reason FROM " + stg + "." + table + " WHERE " + keyCol + " = ?", String.class, key);
+    long seq(String id) {
+        return jdbc.queryForObject("SELECT batch_seq FROM " + aml + ".load_batch WHERE batch_id = ?", Long.class, id);
+    }
+
+    long rejects(String batchId, String entity, String ruleId) {
+        List<Long> n = jdbc.queryForList("SELECT reject_count FROM " + aml + ".load_reject WHERE batch_id = ? AND entity = ? AND rule_id = ?",
+                Long.class, batchId, entity, ruleId);
+        return n.isEmpty() ? 0 : n.get(0);
     }
 
     BigDecimal amount(String txnId) {
         return jdbc.queryForObject("SELECT amount FROM " + mst + ".txn WHERE transaction_id = ?", BigDecimal.class, txnId);
+    }
+
+    boolean stagingExists(String batchId) {
+        long s = seq(batchId);
+        return fx.exists(stg + ".txn_b" + s) || fx.exists(stg + ".customer_b" + s) || fx.exists(stg + ".account_b" + s);
     }
 
     // ---- tests ----------------------------------------------------------------------------------
@@ -104,15 +131,23 @@ class BatchIT {
 
     @Test
     @Req({"REQ-STG-001", "REQ-DB-001"})
-    void stagingRowsNeedARegisteredBatch_andMigrationsSeedReferenceData() {
-        assertThatThrownBy(() -> customer("NO_SUCH_BATCH", "C1", "INDIVIDUAL", "x")).isInstanceOf(DataIntegrityViolationException.class);
+    void registeringABatchCreatesItsStagingPartitions_andOtherBatchIdsAreRefused() {
+        batch("B1", D1, "LOADING");
+        long s = seq("B1");
+        assertThat(fx.partitions(stg, "txn")).containsExactly("txn_b" + s);
+        assertThat(fx.partitions(stg, "customer")).containsExactly("customer_b" + s);
+        assertThat(fx.partitions(stg, "account")).containsExactly("account_b" + s);
+        assertThat(jdbc.queryForObject("SELECT relpersistence FROM pg_class WHERE oid = to_regclass(?)", String.class, stg + ".txn_b" + s))
+                .as("unlogged: no write-ahead log for staging").isEqualTo("u");
+        assertThatThrownBy(() -> customer("NO_SUCH_BATCH", "C1", "INDIVIDUAL", "x")).isInstanceOf(DataAccessException.class);
         assertThat(count(mst + ".ref_txn_type")).isGreaterThanOrEqualTo(20);
     }
 
     @Test
     @Req({"REQ-PRM-001", "REQ-BAT-004"})
-    void cleanBatchIsPromotedThenStagingIsDeleted() {
+    void cleanBatchIsPromotedThenItsStagingPartitionsAreDropped() {
         validBatch("B1", D1, "T1", "9500.00", "T2", "100");
+        long s = seq("B1");
 
         BatchService.Result r = service.promote("B1");
 
@@ -122,10 +157,27 @@ class BatchIT {
         assertThat(count(mst + ".txn")).isEqualTo(2);
         assertThat(amount("T1")).isEqualByComparingTo("9500.00");
         assertThat(jdbc.queryForObject("SELECT batch_id FROM " + mst + ".txn WHERE transaction_id = 'T1'", String.class)).isEqualTo("B1");
-        assertThat(count(stg + ".txn") + count(stg + ".account") + count(stg + ".customer")).isZero();
+        assertThat(fx.exists(stg + ".txn_b" + s)).isFalse();
+        assertThat(fx.partitions(stg, "txn")).isEmpty();
         assertThat(batchStatus("B1")).isEqualTo("CLEANED");
         assertThat(jdbc.queryForObject("SELECT promoted_cnt FROM " + aml + ".load_batch_entity WHERE batch_id = 'B1' AND entity = 'TXN'", Long.class)).isEqualTo(2);
         assertThat(jdbc.queryForObject("SELECT staged_cnt FROM " + aml + ".load_batch_entity WHERE batch_id = 'B1' AND entity = 'TXN'", Long.class)).isEqualTo(2);
+    }
+
+    @Test
+    @Req("REQ-PRM-008")
+    void masterTransactionsLiveInOneAttachedPartitionPerPostingDay_withPrimaryKeyAndAccountIndex() {
+        validBatch("B1", D1, "T1", "10");
+
+        service.promote("B1");
+
+        assertThat(fx.partitions(mst, "txn")).containsExactly("txn_20260930");
+        List<String> defs = jdbc.queryForList("SELECT indexdef FROM pg_indexes WHERE schemaname = ? AND tablename = 'txn_20260930'", String.class, mst);
+        assertThat(defs).anyMatch(d -> d.contains("UNIQUE") && d.contains("(transaction_id, posting_date)"));
+        assertThat(defs).anyMatch(d -> d.contains("(account_id, posting_date)"));
+        assertThat(jdbc.queryForObject("SELECT pg_get_expr(c.relpartbound, c.oid) FROM pg_class c WHERE c.oid = to_regclass(?)", String.class, mst + ".txn_20260930"))
+                .contains("2026-09-30").contains("2026-10-01");
+        assertThat(fx.partitions(mst, "txn").stream().filter(p -> p.startsWith("txn_new_"))).isEmpty();
     }
 
     @Test
@@ -143,68 +195,74 @@ class BatchIT {
 
     @Test
     @Req({"REQ-BAT-002", "REQ-PRM-002", "REQ-PRM-006"})
-    void anyRejectFailsTheWholeBatch_andNothingReachesMaster() {
+    void anyRejectFailsTheWholeBatch_withCountsAndSamplesRecorded_andStagingUntouched() {
         batch("B1", D1, "LOADED");
         customer("B1", "C1", "INDIVIDUAL", "Ada");
         customer("B1", "C2", "ALIEN", "Bad Type");
         account("B1", "A1", "C1", "DEPOSIT", "ACTIVE");
-        account("B1", "A2", "C2", "CARD", "ACTIVE");               // parent rejected
-        txn("B1", "T1", "A1", "CASH_DEPOSIT", "CREDIT", "10");     // fine
+        account("B1", "A2", "NOCUST", "CARD", "ACTIVE");                  // parent in neither master nor this batch
+        txn("B1", "T1", "A1", "CASH_DEPOSIT", "CREDIT", "10");            // fine
         txn("B1", "T2", "A1", "NOT_A_TYPE", "CREDIT", "10");
         txn("B1", "T3", "A1", "CASH_DEPOSIT", "CREDIT", "-5");
-        txn("B1", "T4", "A2", "POS_PURCHASE", "DEBIT", "20");      // grandparent chain rejected
         txn("B1", "T5", "GHOST", "POS_PURCHASE", "DEBIT", "20");
+        txn("B1", "T6", "A1", "CASH_DEPOSIT", "SIDE", "20");
 
         BatchService.Result r = service.promote("B1");
 
         assertThat(r.outcome()).isEqualTo(BatchService.Outcome.FAILED);
         assertThat(batchStatus("B1")).isEqualTo("FAILED");
         assertThat(count(mst + ".customer") + count(mst + ".account") + count(mst + ".txn")).isZero();
-        assertThat(reason("customer", "customer_id", "C2")).startsWith("CUS-002:");
-        assertThat(reason("account", "account_id", "A2")).startsWith("ACC-003:");
-        assertThat(reason("txn", "transaction_id", "T2")).startsWith("TXN-006:");
-        assertThat(reason("txn", "transaction_id", "T3")).startsWith("TXN-004:");
-        assertThat(reason("txn", "transaction_id", "T4")).startsWith("TXN-002:");
-        assertThat(reason("txn", "transaction_id", "T5")).startsWith("TXN-002:");
-        assertThat(jdbc.queryForObject("SELECT reject_reason FROM " + stg + ".txn WHERE transaction_id = 'T1'", String.class)).isNull();
+        assertThat(fx.partitions(mst, "txn")).isEmpty();
+        assertThat(rejects("B1", "CUSTOMER", "CUS-002")).isEqualTo(1);
+        assertThat(rejects("B1", "ACCOUNT", "ACC-003")).isEqualTo(1);
+        assertThat(rejects("B1", "TXN", "TXN-006")).isEqualTo(1);
+        assertThat(rejects("B1", "TXN", "TXN-004")).isEqualTo(1);
+        assertThat(rejects("B1", "TXN", "TXN-002")).isEqualTo(1);
+        assertThat(rejects("B1", "TXN", "TXN-005")).isEqualTo(1);
+        assertThat(jdbc.queryForObject("SELECT CAST(sample_keys AS text) FROM " + aml + ".load_reject WHERE batch_id = 'B1' AND rule_id = 'TXN-002'", String.class)).contains("T5");
+        assertThat(jdbc.queryForObject("SELECT reason FROM " + aml + ".load_reject WHERE batch_id = 'B1' AND rule_id = 'TXN-004'", String.class)).startsWith("TXN-004:");
         assertThat(jdbc.queryForObject("SELECT rejected_cnt FROM " + aml + ".load_batch_entity WHERE batch_id = 'B1' AND entity = 'TXN'", Long.class)).isEqualTo(4);
+        assertThat(count(stg + ".txn")).as("staged rows are never modified or removed on failure").isEqualTo(5);
         assertThat(jdbc.queryForObject("SELECT error_msg FROM " + aml + ".load_batch WHERE batch_id = 'B1'", String.class)).contains("failed validation");
     }
 
     @Test
     @Req("REQ-BAT-003")
-    void failureDuringLoadLeavesMasterUnchanged() {
+    void failureDuringTheMasterStepLeavesMasterUnchanged() {
         validBatch("B1", D1, "T1", "10");
         jdbc.execute("CREATE OR REPLACE FUNCTION " + mst + ".boom() RETURNS trigger AS $$ BEGIN RAISE EXCEPTION 'simulated failure'; END $$ LANGUAGE plpgsql");
-        jdbc.execute("CREATE TRIGGER fail_txn BEFORE INSERT ON " + mst + ".txn FOR EACH ROW EXECUTE FUNCTION " + mst + ".boom()");
+        jdbc.execute("CREATE TRIGGER fail_acct BEFORE INSERT ON " + mst + ".account FOR EACH ROW EXECUTE FUNCTION " + mst + ".boom()");
 
         assertThatThrownBy(() -> service.promote("B1")).hasMessageContaining("simulated failure");
 
-        jdbc.execute("DROP TRIGGER fail_txn ON " + mst + ".txn");
-        assertThat(count(mst + ".customer") + count(mst + ".account") + count(mst + ".txn")).isZero();
+        jdbc.execute("DROP TRIGGER fail_acct ON " + mst + ".account");
+        assertThat(count(mst + ".customer") + count(mst + ".account") + count(mst + ".txn")).as("customer upsert rolled back too").isZero();
+        assertThat(fx.partitions(mst, "txn")).isEmpty();
+        assertThat(fx.exists(mst + ".txn_new_" + seq("B1"))).as("the offline-built partition is cleaned up").isFalse();
         assertThat(batchStatus("B1")).isEqualTo("FAILED");
-        assertThat(count(stg + ".txn")).isEqualTo(1);   // staged data untouched
+        assertThat(count(stg + ".txn")).as("staged data untouched").isEqualTo(1);
     }
 
     @Test
     @Req("REQ-BAT-005")
-    void cleanDeletesAFailedBatchesStagingRows() {
+    void cleanDropsAFailedBatchesStagingPartitions() {
         batch("B1", D1, "LOADED");
         customer("B1", "C1", "ALIEN", "Bad");
         service.promote("B1");
+        assertThat(stagingExists("B1")).isTrue();
 
         service.clean("B1");
 
-        assertThat(count(stg + ".customer")).isZero();
+        assertThat(stagingExists("B1")).isFalse();
         assertThat(batchStatus("B1")).isEqualTo("FAILED");
         assertThatCode(() -> service.clean("B1")).doesNotThrowAnyException();   // idempotent
-        batch("B2", D1, "LOADED");   // reload under a new id
+        batch("B2", D1, "LOADED");
         assertThatThrownBy(() -> service.clean("B2")).hasMessageContaining("needs FAILED or PROMOTED");
     }
 
     @Test
     @Req("REQ-BAT-006")
-    void laterBatchForSameDateReplacesTheEarlierOnesTransactions() {
+    void laterBatchForSameDateSwapsInThePostingDaysPartition() {
         validBatch("B1", D1, "T1", "100", "T2", "200");
         service.promote("B1");
 
@@ -212,6 +270,7 @@ class BatchIT {
         BatchService.Result r = service.promote("B2");
 
         assertThat(r.outcome()).isEqualTo(BatchService.Outcome.PROMOTED);
+        assertThat(fx.partitions(mst, "txn")).containsExactly("txn_20260930");
         assertThat(count(mst + ".txn")).isEqualTo(2);
         assertThat(amount("T1")).isEqualByComparingTo("150");
         assertThat(amount("T3")).isEqualByComparingTo("300");
@@ -229,13 +288,28 @@ class BatchIT {
         validBatch("B1", D1, "T1", "10");
         service.promote("B1");
 
-        validBatch("B2", D2, "T1", "10", "T9", "5", "T9", "6");   // T1 live in B1 (other date); T9 twice in B2
+        validBatch("B2", D2, "T1", "10", "T9", "5", "T9", "6");   // T1 is in yesterday's partition; T9 twice in this batch
         BatchService.Result r = service.promote("B2");
 
         assertThat(r.outcome()).isEqualTo(BatchService.Outcome.FAILED);
-        assertThat(reason("txn", "transaction_id", "T1")).startsWith("TXN-009:");
-        assertThat(jdbc.queryForList("SELECT reject_reason FROM " + stg + ".txn WHERE transaction_id = 'T9'", String.class))
-                .hasSize(2).allSatisfy(s -> assertThat(s).startsWith("TXN-008:"));
+        assertThat(rejects("B2", "TXN", "TXN-009")).isEqualTo(1);
+        assertThat(rejects("B2", "TXN", "TXN-008")).isEqualTo(2);
+    }
+
+    @Test
+    @Req("REQ-BAT-011")
+    void transactionsMustBePostedOnTheBatchDateMinusTheOffset() {
+        batch("B1", D1, "LOADED");
+        customer("B1", "C1", "INDIVIDUAL", "Ada");
+        account("B1", "A1", "C1", "DEPOSIT", "ACTIVE");
+        txnOn("B1", "2026-09-30", "T1", "A1", "CASH_DEPOSIT", "CREDIT", "10");   // D1 minus 1: fine
+        txnOn("B1", "2026-10-01", "T2", "A1", "CASH_DEPOSIT", "CREDIT", "10");   // the business date itself: wrong day
+        txnOn("B1", "2026-09-29", "T3", "A1", "CASH_DEPOSIT", "CREDIT", "10");   // a day too early
+
+        BatchService.Result r = service.promote("B1");
+
+        assertThat(r.outcome()).isEqualTo(BatchService.Outcome.FAILED);
+        assertThat(rejects("B1", "TXN", "TXN-010")).isEqualTo(2);
     }
 
     @Test
@@ -259,11 +333,12 @@ class BatchIT {
         assertThat(jdbc.queryForObject("SELECT full_name FROM " + mst + ".customer WHERE customer_id = 'C1'", String.class)).isEqualTo("Ada King");
         assertThat(jdbc.queryForObject("SELECT status FROM " + mst + ".account WHERE account_id = 'A1'", String.class)).isEqualTo("DORMANT");
         assertThat(jdbc.queryForObject("SELECT batch_id FROM " + mst + ".customer WHERE customer_id = 'C1'", String.class)).isEqualTo("B2");
+        assertThat(fx.partitions(mst, "txn")).containsExactly("txn_20260930", "txn_20261001");
     }
 
     @Test
     @Req("REQ-BAT-008")
-    void reopenLetsCorrectedStagingRowsBePromoted() {
+    void reopenLetsCorrectedStagingRowsBePromoted_butNotAfterTheStagingWasCleaned() {
         batch("B1", D1, "LOADED");
         customer("B1", "C1", "ALIEN", "Ada");
         assertThat(service.promote("B1").outcome()).isEqualTo(BatchService.Outcome.FAILED);
@@ -271,10 +346,16 @@ class BatchIT {
         jdbc.update("UPDATE " + stg + ".customer SET customer_type = 'INDIVIDUAL' WHERE customer_id = 'C1'");   // ETL fixes the row
         service.reopen("B1");
         assertThat(batchStatus("B1")).isEqualTo("LOADED");
-        assertThat(jdbc.queryForObject("SELECT reject_reason FROM " + stg + ".customer WHERE customer_id = 'C1'", String.class)).isNull();
+        assertThat(count(aml + ".load_reject")).isZero();
 
         assertThat(service.promote("B1").outcome()).isEqualTo(BatchService.Outcome.PROMOTED);
         assertThat(count(mst + ".customer")).isEqualTo(1);
+
+        batch("B2", D2, "LOADED");
+        customer("B2", "C1", "ALIEN", "Ada");
+        service.promote("B2");
+        service.clean("B2");
+        assertThatThrownBy(() -> service.reopen("B2")).hasMessageContaining("already cleaned");
     }
 
     @Test

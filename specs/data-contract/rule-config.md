@@ -19,7 +19,8 @@ Common to every template: `product_types` (optional list of CARD, LOAN, DEPOSIT;
 `direction` (CREDIT, DEBIT or ANY), `channels` (list), `min_amount` (inclusive), `max_amount` (exclusive).
 Direction is from the account's point of view: CREDIT adds funds to the account or reduces what a card or loan owes.
 
-Windows are in posting days and end on the business date: an N-day window is `[date - (N-1), date]`.
+Windows are in posting days and end on the **as-of day** (the posting day, which is the batch's business date minus `posting-offset-days`): an N-day window is `[as_of - (N-1), as_of]`.
+A rule only evaluates accounts that had a matching transaction on the as-of day (new activity); it then looks back over the window.
 
 | Template | Keys | Meaning |
 |---|---|---|
@@ -33,7 +34,7 @@ Test scenarios (run by the build, REQ-RULE-009):
 ```yaml
 tests:
   - name: three cash deposits under the limit
-    business_date: 2026-09-30
+    as_of: 2026-09-30                              # the posting day the windows end on
     accounts: [{id: A1, product: DEPOSIT}]        # optional: customer, open_date (default 2020-01-01)
     txns:
       - {id: T1, account: A1, type: CASH_DEPOSIT, direction: CREDIT, amount: 4000, date: 2026-09-30, time: "10:00"}

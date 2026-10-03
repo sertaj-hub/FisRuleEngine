@@ -22,7 +22,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 @SpringBootTest
 class DetectionIT {
 
-    static final LocalDate D = LocalDate.parse("2026-09-30");
+    static final LocalDate D = LocalDate.parse("2026-10-01");   // business date; the posting day is 2026-09-30
 
     @Autowired JdbcTemplate jdbc;
     @Autowired FisreProperties props;
@@ -58,7 +58,7 @@ class DetectionIT {
     @Test
     @Req("REQ-DET-001")
     void alertGoesToThePrimaryCustomerWithEvidenceAndLinkedTransactions() throws IOException {
-        fx.liveBatch("B1", "2026-09-30");
+        fx.liveBatch("B1", "2026-10-01");
         fx.account("A1", "DEPOSIT", "CUST-PRIMARY", "2020-01-01");
         cashDay("T1", "2026-09-30", "70");
         cashDay("T2", "2026-09-30", "80");
@@ -82,16 +82,16 @@ class DetectionIT {
     void detectionIsRefusedWithoutALiveBatchForTheDate() throws IOException {
         fx.account("A1", "DEPOSIT", "C1", "2020-01-01");
         loadRule(0);
-        fx.liveBatch("B0", "2026-09-29");
+        fx.liveBatch("B0", "2026-09-30");
 
-        assertThatThrownBy(() -> detection.detect(D)).hasMessageContaining("No live (promoted) batch for business date 2026-09-30");
+        assertThatThrownBy(() -> detection.detect(D)).hasMessageContaining("No live (promoted) batch for business date 2026-10-01");
         assertThat(alerts()).isZero();
     }
 
     @Test
     @Req("REQ-DET-003")
     void rerunReplacesUnsentAlertsWithoutDuplicates() throws IOException {
-        fx.liveBatch("B1", "2026-09-30");
+        fx.liveBatch("B1", "2026-10-01");
         fx.account("A1", "DEPOSIT", "C1", "2020-01-01");
         cashDay("T1", "2026-09-30", "150");
         loadRule(0);
@@ -109,7 +109,7 @@ class DetectionIT {
     @Test
     @Req("REQ-DET-004")
     void handedOffAlertsAreNeverDeletedOrDuplicated() throws IOException {
-        fx.liveBatch("B1", "2026-09-30");
+        fx.liveBatch("B1", "2026-10-01");
         fx.account("A1", "DEPOSIT", "C1", "2020-01-01");
         cashDay("T1", "2026-09-30", "150");
         loadRule(0);
@@ -128,17 +128,17 @@ class DetectionIT {
     @Test
     @Req("REQ-DET-005")
     void suppressDaysStopsTheSameAccountAlertingAgainSoon() throws IOException {
-        fx.liveBatch("B1", "2026-09-29");
-        fx.liveBatch("B2", "2026-09-30");
+        fx.liveBatch("B1", "2026-09-30");
+        fx.liveBatch("B2", "2026-10-01");
         fx.account("A1", "DEPOSIT", "C1", "2020-01-01");
         cashDay("T1", "2026-09-29", "150");
         cashDay("T2", "2026-09-30", "150");
         loadRule(3);
 
-        detection.detect(LocalDate.parse("2026-09-29"));
+        detection.detect(LocalDate.parse("2026-09-30"));
         detection.detect(D);
 
-        assertThat(jdbc.queryForList("SELECT CAST(business_date AS text) FROM " + aml + ".alert", String.class)).containsExactly("2026-09-29");
+        assertThat(jdbc.queryForList("SELECT CAST(business_date AS text) FROM " + aml + ".alert", String.class)).containsExactly("2026-09-30");
 
         // outside the suppression period the account alerts again
         jdbc.update("UPDATE " + aml + ".rule SET suppress_days = 0");
@@ -149,7 +149,7 @@ class DetectionIT {
     @Test
     @Req({"REQ-DET-006", "REQ-DET-007"})
     void aFailingRuleIsRecordedAndDoesNotStopTheOthers() throws IOException {
-        fx.liveBatch("B1", "2026-09-30");
+        fx.liveBatch("B1", "2026-10-01");
         fx.account("A1", "DEPOSIT", "C1", "2020-01-01");
         cashDay("T1", "2026-09-30", "150");
         loadRule(0);
@@ -162,7 +162,45 @@ class DetectionIT {
         assertThat(jdbc.queryForList("SELECT rule_code || ':' || status || ':' || alerts_created FROM " + aml + ".rule_run ORDER BY rule_code", String.class))
                 .containsExactly("A_BROKEN:FAILED:0", "T_RULE:SUCCESS:1");
         assertThat(jdbc.queryForObject("SELECT error_msg FROM " + aml + ".rule_run WHERE rule_code = 'A_BROKEN'", String.class)).contains("Unknown template");
-        assertThat(jdbc.queryForObject("SELECT CAST(business_date AS text) FROM " + aml + ".rule_run WHERE rule_code = 'T_RULE'", String.class)).isEqualTo("2026-09-30");
+        assertThat(jdbc.queryForObject("SELECT CAST(business_date AS text) FROM " + aml + ".rule_run WHERE rule_code = 'T_RULE'", String.class)).isEqualTo("2026-10-01");
         assertThat(jdbc.queryForObject("SELECT ended_ts IS NOT NULL FROM " + aml + ".rule_run WHERE rule_code = 'T_RULE'", Boolean.class)).isTrue();
+    }
+
+    @Test
+    @Req("REQ-DET-012")
+    void windowsEndOnThePostingDay_notTheBusinessDate() throws IOException {
+        fx.liveBatch("B1", "2026-10-01");
+        fx.account("A1", "DEPOSIT", "C1", "2020-01-01");
+        cashDay("T1", "2026-10-01", "150");          // posted on the business date itself: not part of this batch's day
+        loadRule(0);
+
+        detection.detect(D);
+        assertThat(alerts()).isZero();
+
+        cashDay("T2", "2026-09-30", "150");          // posted on D-1: found
+        detection.detect(D);
+        assertThat(alerts()).isEqualTo(1);
+        assertThat(jdbc.queryForObject("SELECT CAST(business_date AS text) FROM " + aml + ".alert", String.class)).isEqualTo("2026-10-01");
+    }
+
+    @Test
+    @Req("REQ-DET-009")
+    void allRulesRunConcurrentlyWithTheSameResultAsOneByOne() throws IOException {
+        fx.liveBatch("B1", "2026-10-01");
+        fx.account("A1", "DEPOSIT", "C1", "2020-01-01");
+        fx.account("L1", "LOAN", "C2", "2020-01-01");
+        fx.txn("T1", "A1", "CASH_DEPOSIT", "CREDIT", "6000", "2026-09-30");
+        fx.txn("T2", "A1", "CASH_DEPOSIT", "CREDIT", "5000", "2026-09-30");
+        fx.txn("T3", "L1", "LOAN_DISBURSEMENT", "CREDIT", "20000", "2026-08-21");
+        fx.txn("T4", "L1", "LOAN_PAYOFF", "CREDIT", "20500", "2026-09-30");
+        loader.load(Path.of("..", "specs", "rules"));
+
+        DetectionService.Result r = detection.detect(D);
+
+        assertThat(r.rulesRun()).isEqualTo(7);
+        assertThat(r.rulesFailed()).isZero();
+        assertThat(jdbc.queryForList("SELECT rule_code || ':' || account_id FROM " + aml + ".alert ORDER BY 1", String.class))
+                .containsExactly("DORMANT_REACTIVATION:A1", "LARGE_CASH_DAILY:A1", "LOAN_EARLY_PAYOFF:L1");
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM " + aml + ".rule_run WHERE status = 'SUCCESS'", Long.class)).isEqualTo(7);
     }
 }

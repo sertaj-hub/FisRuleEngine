@@ -16,3 +16,4 @@ There is no per-rule severity. Config reference: `data-contract/rule-config.md`.
 | REQ-RULE-008 | Template `DORMANT_REACTIVATION`: accounts open longer than N days, with no transactions in the previous N days, that transact on the business date above a minimum. | Implemented |
 | REQ-RULE-009 | Every rule spec carries test scenarios (at least one expecting an alert and one expecting none) that the build runs against the database, and every template is used by at least one spec. | Implemented |
 | REQ-RULE-010 | Rules are created and edited from a UI. | Planned |
+| REQ-RULE-011 | A rule evaluates only accounts that have a matching transaction on the as-of day (new activity); an account whose window already holds the pattern but has no new matching activity that day gets no alert. | Implemented |

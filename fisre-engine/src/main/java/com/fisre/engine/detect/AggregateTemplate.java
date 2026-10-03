@@ -35,11 +35,15 @@ public class AggregateTemplate extends TemplateSupport {
         params.put("min_count", optInt(c, "min_count", 1));
         params.put("min_sum", decimal(c, "min_sum", BigDecimal.ZERO));
         String f = filter(c, "filter", false).sql("t", "f_", params, mst);
+        // Candidate pruning: a rule only fires for accounts with a matching transaction on the as-of day (one partition).
+        String candidates = "SELECT DISTINCT c.account_id FROM " + mst + ".txn c WHERE "
+                + filter(c, "filter", false).sql("c", "f_", params, mst) + " AND c.posting_date = :end";
         String hits = "SELECT a.account_id, a.primary_customer_id AS customer_id, a.product_type, jsonb_build_object("
                 + "'window_days', CAST(:window_days AS integer), 'txn_count', COUNT(*), 'total', SUM(t.amount), "
                 + "'min_count', CAST(:min_count AS integer), 'min_sum', CAST(:min_sum AS numeric)) AS evidence "
                 + "FROM " + mst + ".txn t JOIN " + mst + ".account a ON a.account_id = t.account_id "
                 + "WHERE " + productClause(c, params) + " AND " + f + " AND t.posting_date BETWEEN :start AND :end "
+                + "AND t.account_id IN (" + candidates + ") "
                 + "GROUP BY a.account_id, a.primary_customer_id, a.product_type "
                 + "HAVING COUNT(*) >= :min_count AND SUM(t.amount) >= :min_sum";
         String evidence = "SELECT t.account_id, t.transaction_id FROM " + mst + ".txn t "

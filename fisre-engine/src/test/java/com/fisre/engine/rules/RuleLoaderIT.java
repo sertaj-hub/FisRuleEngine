@@ -110,11 +110,11 @@ class RuleLoaderIT {
         write("D.yml", yaml("DRAFT_ONE", "DRAFT", "100"));
         write("R.yml", yaml("RETIRED_ONE", "RETIRED", "100"));
         loader.load(tmp);
-        fx.liveBatch("B1", "2026-09-30");
+        fx.liveBatch("B1", "2026-10-01");
         fx.account("A1", "DEPOSIT", "C1", "2020-01-01");
         fx.txn("T1", "A1", "CASH_DEPOSIT", "CREDIT", "500", "2026-09-30");
 
-        DetectionService.Result r = detection.detect(LocalDate.parse("2026-09-30"));
+        DetectionService.Result r = detection.detect(LocalDate.parse("2026-10-01"));
 
         assertThat(r.rulesRun()).isEqualTo(1);
         assertThat(jdbc.queryForList("SELECT rule_code FROM " + aml + ".alert", String.class)).containsExactly("ACTIVE_ONE");

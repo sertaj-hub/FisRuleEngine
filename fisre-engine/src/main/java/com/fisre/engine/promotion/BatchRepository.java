@@ -10,32 +10,39 @@ import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Repository;
 
-/** Reads and writes aml.load_batch and aml.load_batch_entity. */
+/** Reads and writes aml.load_batch, aml.load_batch_entity and aml.load_reject. */
 @Repository
 public class BatchRepository {
 
-    public record Batch(String batchId, LocalDate businessDate, String status) {}
+    public record Batch(String batchId, long seq, LocalDate businessDate, String status, boolean cleaned) {}
 
     private final NamedParameterJdbcTemplate jdbc;
     private final Dialect dialect;
     private final String batch;
     private final String batchEntity;
+    private final String reject;
 
     public BatchRepository(NamedParameterJdbcTemplate jdbc, Dialect dialect, FisreProperties props) {
         this.jdbc = jdbc;
         this.dialect = dialect;
         this.batch = props.schemas().aml() + ".load_batch";
         this.batchEntity = props.schemas().aml() + ".load_batch_entity";
+        this.reject = props.schemas().aml() + ".load_reject";
     }
 
     public Batch get(String batchId) {
-        List<Batch> rows = jdbc.query("SELECT batch_id, business_date, status FROM " + batch + " WHERE batch_id = :id",
+        List<Batch> rows = jdbc.query("SELECT batch_id, batch_seq, business_date, status, cleaned_ts FROM " + batch + " WHERE batch_id = :id",
                 Map.of("id", batchId),
-                (rs, i) -> new Batch(rs.getString(1), rs.getDate(2).toLocalDate(), rs.getString(3)));
+                (rs, i) -> new Batch(rs.getString(1), rs.getLong(2), rs.getDate(3).toLocalDate(), rs.getString(4), rs.getTimestamp(5) != null));
         if (rows.isEmpty()) {
             throw new IllegalArgumentException("Unknown batch_id '" + batchId + "'");
         }
         return rows.get(0);
+    }
+
+    /** LOADED batches, oldest business date first. */
+    public List<String> loadedBatchIds() {
+        return jdbc.queryForList("SELECT batch_id FROM " + batch + " WHERE status = 'LOADED' ORDER BY business_date, batch_seq", Map.of(), String.class);
     }
 
     /** Atomically moves a batch from {@code from} to {@code to}; fails if it is in any other status. */
@@ -76,17 +83,27 @@ public class BatchRepository {
                 Map.of("id", batchId));
     }
 
+    /** Back to LOADED with no counts or reject records. */
     public void reopen(String batchId) {
-        jdbc.update("UPDATE " + batch + " SET status = 'LOADED', error_msg = NULL, cleaned_ts = NULL WHERE batch_id = :id",
-                Map.of("id", batchId));
+        jdbc.update("UPDATE " + batch + " SET status = 'LOADED', error_msg = NULL WHERE batch_id = :id", Map.of("id", batchId));
+        clearResults(batchId);
+    }
+
+    public void clearResults(String batchId) {
+        jdbc.update("DELETE FROM " + reject + " WHERE batch_id = :id", Map.of("id", batchId));
         jdbc.update("DELETE FROM " + batchEntity + " WHERE batch_id = :id", Map.of("id", batchId));
     }
 
     public void saveCounts(String batchId, String entity, long staged, long rejected) {
-        jdbc.update("DELETE FROM " + batchEntity + " WHERE batch_id = :id AND entity = :e",
-                Map.of("id", batchId, "e", entity));
         jdbc.update("INSERT INTO " + batchEntity + " (batch_id, entity, staged_cnt, rejected_cnt, promoted_cnt)"
                 + " VALUES (:id, :e, :s, :r, 0)", new MapSqlParameterSource(Map.of("id", batchId, "e", entity, "s", staged, "r", rejected)));
+    }
+
+    public void saveReject(String batchId, String entity, String ruleId, String reason, long count, String sampleKeysJson) {
+        jdbc.update("INSERT INTO " + reject + " (batch_id, entity, rule_id, reason, reject_count, sample_keys)"
+                + " VALUES (:id, :e, :r, :reason, :n, CAST(:keys AS jsonb))",
+                new MapSqlParameterSource().addValue("id", batchId).addValue("e", entity).addValue("r", ruleId)
+                        .addValue("reason", reason).addValue("n", count).addValue("keys", sampleKeysJson));
     }
 
     public void savePromoted(String batchId, String entity, long promoted) {

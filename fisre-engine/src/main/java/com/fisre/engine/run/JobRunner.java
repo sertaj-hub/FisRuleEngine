@@ -3,6 +3,8 @@ package com.fisre.engine.run;
 import com.fisre.engine.config.FisreProperties;
 import com.fisre.engine.detect.DetectionService;
 import com.fisre.engine.promotion.BatchService;
+import com.fisre.engine.promotion.RetentionService;
+import com.fisre.engine.promotion.SyntheticData;
 import com.fisre.engine.rules.RuleLoader;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -24,12 +26,17 @@ public class JobRunner implements ApplicationRunner {
     private final BatchService batches;
     private final RuleLoader rules;
     private final DetectionService detection;
+    private final RetentionService retention;
+    private final SyntheticData synthetic;
 
-    public JobRunner(FisreProperties props, BatchService batches, RuleLoader rules, DetectionService detection) {
+    public JobRunner(FisreProperties props, BatchService batches, RuleLoader rules, DetectionService detection,
+                     RetentionService retention, SyntheticData synthetic) {
         this.props = props;
         this.batches = batches;
         this.rules = rules;
         this.detection = detection;
+        this.retention = retention;
+        this.synthetic = synthetic;
     }
 
     @Override
@@ -43,11 +50,31 @@ public class JobRunner implements ApplicationRunner {
             rules.load(java.nio.file.Path.of(props.rulesDir()));
             return;
         }
-        if (job.equals("detect")) {
-            if (props.businessDate() == null || props.businessDate().isBlank()) {
-                throw new IllegalArgumentException("fisre.job=detect needs fisre.business-date (FISRE_BUSINESS_DATE, YYYY-MM-DD)");
+        if (job.equals("promote-loaded")) {
+            var results = batches.promoteLoaded();
+            long failed = results.stream().filter(r -> r.outcome() == BatchService.Outcome.FAILED).count();
+            if (failed > 0) {
+                throw new IllegalStateException(failed + " of " + results.size() + " batch(es) failed; see aml.load_batch and aml.load_reject");
             }
-            DetectionService.Result r = detection.detect(java.time.LocalDate.parse(props.businessDate()));
+            return;
+        }
+        if (java.util.Set.of("detect", "retain", "generate").contains(job)) {
+            if (props.businessDate() == null || props.businessDate().isBlank()) {
+                throw new IllegalArgumentException("fisre.job=" + job + " needs fisre.business-date (FISRE_BUSINESS_DATE, YYYY-MM-DD)");
+            }
+            java.time.LocalDate date = java.time.LocalDate.parse(props.businessDate());
+            if (job.equals("retain")) {
+                retention.retain(date);
+                return;
+            }
+            if (job.equals("generate")) {
+                if (props.batchId() == null || props.batchId().isBlank()) {
+                    throw new IllegalArgumentException("fisre.job=generate needs fisre.batch-id (FISRE_BATCH_ID)");
+                }
+                synthetic.generate(props.batchId(), date);
+                return;
+            }
+            DetectionService.Result r = detection.detect(date);
             if (r.rulesFailed() > 0) {
                 throw new IllegalStateException(r.rulesFailed() + " of " + r.rulesRun() + " rule(s) failed; see aml.rule_run");
             }
@@ -55,7 +82,7 @@ public class JobRunner implements ApplicationRunner {
         }
         String batchId = props.batchId();
         if (!java.util.Set.of("promote", "clean", "reopen").contains(job)) {
-            throw new IllegalArgumentException("Unknown fisre.job '" + job + "' (expected none, promote, clean, reopen, load-rules or detect)");
+            throw new IllegalArgumentException("Unknown fisre.job '" + job + "' (expected none, promote, promote-loaded, clean, reopen, load-rules, detect, retain or generate)");
         }
         if (batchId == null || batchId.isBlank()) {
             throw new IllegalArgumentException("fisre.job=" + job + " needs fisre.batch-id (FISRE_BATCH_ID)");

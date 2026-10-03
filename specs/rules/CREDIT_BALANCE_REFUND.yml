@@ -16,14 +16,14 @@ config:
   then_min_pct_of_first: 50
 tests:
   - name: large payment, refund of most of it two weeks later
-    business_date: 2026-09-30
+    as_of: 2026-09-30
     accounts: [{id: A1, product: CARD}]
     txns:
       - {id: T1, account: A1, type: CARD_PAYMENT, direction: CREDIT, amount: 5000, date: 2026-09-15}
       - {id: T2, account: A1, type: CREDIT_BALANCE_REFUND, direction: DEBIT, amount: 4000, date: 2026-09-30}
     expect_alerts: [A1]
   - name: refund with no earlier payment, payment too long ago, or refund before the payment
-    business_date: 2026-09-30
+    as_of: 2026-09-30
     accounts: [{id: A1, product: CARD}, {id: A2, product: CARD}, {id: A3, product: CARD}]
     txns:
       - {id: T1, account: A1, type: CREDIT_BALANCE_REFUND, direction: DEBIT, amount: 4000, date: 2026-09-30}

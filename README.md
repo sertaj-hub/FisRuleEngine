@@ -6,10 +6,10 @@ Batch transaction-monitoring (AML) detection for card, loan and deposit accounts
 bank ETL ─► stg (customer, account, txn, tagged batch_id) ─[promote batch]─► mst ─[detect: rules]─► aml (alerts)
 ```
 
-A **batch** is one business date and succeeds or fails as a whole. On success its stg rows are deleted; on failure
-fix stg and `reopen`, or `clean` and reload under a new batch id. Protocol: [`specs/data-contract/batch-protocol.md`](specs/data-contract/batch-protocol.md).
+A **batch** is one business date and succeeds or fails as a whole. The 1 am batch for business date D carries the transactions posted on **D-1** (`FISRE_POSTING_OFFSET_DAYS`, default 1). On success its staging partitions are dropped; on failure
+fix stg and `reopen`, or `clean` and reload under a new batch id. The ETL registers a batch by inserting into `aml.load_batch`, which creates its staging partitions `<table>_b<batch_seq>`; load straight into those for speed. Protocol: [`specs/data-contract/batch-protocol.md`](specs/data-contract/batch-protocol.md).
 
-Status: Phases 0 to 3 done (foundation, batch promotion, rule framework, seven starter rules). Next: performance at 10M transactions a day (Phase 4).
+Status: Phases 0 to 4 done (foundation, batch promotion, rule framework, seven starter rules, partitioned scale design). Designed for 10M transactions a day and 13 months of history ([ADR-0005](specs/adr/0005-scale-design.md)).
 Specs: [`specs/`](specs/README.md). Decisions: [`specs/adr/`](specs/adr).
 
 ## Run
@@ -18,11 +18,15 @@ Specs: [`specs/`](specs/README.md). Decisions: [`specs/adr/`](specs/adr).
 docker compose up -d postgres            # or any PostgreSQL with schemas stg, mst, aml (ops/db/postgresql/)
 export FISRE_DB_URL=jdbc:postgresql://localhost:5432/fisre FISRE_DB_USER=fisre FISRE_DB_PASSWORD=fisre
 mvn -q -pl fisre-engine package -DskipTests
-# every run migrates the schema first, then runs one job: promote | clean | reopen | load-rules | detect   (none = migrate only)
+# every run migrates the schema first, then runs one job (none = migrate only):
+#   promote | promote-loaded | clean | reopen | load-rules | detect | retain | generate
 JAR=fisre-engine/target/fisre-engine-0.1.0-SNAPSHOT.jar
 FISRE_JOB=promote FISRE_BATCH_ID=2026-09-30-01 java -jar $JAR      # stg -> mst for one batch
 FISRE_JOB=load-rules FISRE_RULES_DIR=specs/rules java -jar $JAR    # rule specs -> aml.rule (versioned)
-FISRE_JOB=detect FISRE_BUSINESS_DATE=2026-09-30 java -jar $JAR     # active rules -> aml.alert
+FISRE_JOB=detect FISRE_BUSINESS_DATE=2026-10-01 java -jar $JAR     # active rules -> aml.alert
+FISRE_JOB=promote-loaded java -jar $JAR                            # history: every LOADED batch, earliest first then in parallel
+FISRE_JOB=retain FISRE_BUSINESS_DATE=2026-10-01 java -jar $JAR     # drop partitions older than 13 months
+FISRE_JOB=generate FISRE_BATCH_ID=G1 FISRE_BUSINESS_DATE=2026-10-01 FISRE_BENCH_TXNS=1000000 FISRE_BENCH_ACCOUNTS=100000 java -jar $JAR   # synthetic batch
 ```
 
 Schema names: `FISRE_SCHEMA_STG|MST|AML`. Exit code is non-zero when a batch fails or any rule fails.

@@ -6,8 +6,13 @@ import com.fisre.engine.config.FisreProperties;
 import com.fisre.engine.db.Dialect;
 import java.time.LocalDate;
 import java.util.HashMap;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.slf4j.Logger;
@@ -37,6 +42,7 @@ public class DetectionService {
     private final Map<String, Template> templates;
     private final String mst;
     private final String aml;
+    private final FisreProperties.Tuning tuning;
 
     public DetectionService(NamedParameterJdbcTemplate jdbc, TransactionTemplate tx, Dialect dialect,
                             List<Template> templates, FisreProperties props) {
@@ -46,6 +52,7 @@ public class DetectionService {
         this.templates = templates.stream().collect(Collectors.toMap(Template::code, Function.identity()));
         this.mst = props.schemas().mst();
         this.aml = props.schemas().aml();
+        this.tuning = props.tuning();
     }
 
     public Result detect(LocalDate date) {
@@ -54,34 +61,59 @@ public class DetectionService {
         if (live == null || live == 0) {
             throw new IllegalStateException("No live (promoted) batch for business date " + date + "; promote a batch first");
         }
-        int run = 0;
-        int failed = 0;
-        long alerts = 0;
-        for (ActiveRule r : activeRules()) {
-            long runId = startRun(r, date);
-            try {
-                Long created = tx.execute(s -> detectOne(r, date, runId));
-                finishRun(runId, "SUCCESS", created, null);
-                alerts += created;
-                run++;
-                log.info("Rule {} for {}: {} alert(s)", r.code(), date, created);
-            } catch (RuntimeException e) {
-                finishRun(runId, "FAILED", 0L, e.toString());
-                failed++;
-                run++;
-                log.error("Rule {} failed for {}", r.code(), date, e);
+        LocalDate asOf = date.minusDays(tuning.postingOffsetDays());
+        List<ActiveRule> rules = activeRules();
+        ExecutorService pool = Executors.newFixedThreadPool(Math.max(1, Math.min(tuning.detectParallelism(), Math.max(1, rules.size()))));
+        List<Future<Long>> futures = new ArrayList<>();
+        try {
+            for (ActiveRule r : rules) {
+                futures.add(pool.submit(() -> runRule(r, date, asOf)));
             }
+            int failed = 0;
+            long alerts = 0;
+            for (Future<Long> f : futures) {
+                try {
+                    long created = f.get();
+                    if (created < 0) {
+                        failed++;
+                    } else {
+                        alerts += created;
+                    }
+                } catch (ExecutionException e) {
+                    throw new IllegalStateException(e.getCause());
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    throw new IllegalStateException(e);
+                }
+            }
+            return new Result(rules.size(), failed, alerts);
+        } finally {
+            pool.shutdown();
         }
-        return new Result(run, failed, alerts);
     }
 
-    private long detectOne(ActiveRule r, LocalDate date, long runId) {
+    /** Runs one rule in its own transaction. Returns alerts created, or -1 if the rule failed (recorded in aml.rule_run). */
+    private long runRule(ActiveRule r, LocalDate date, LocalDate asOf) {
+        long runId = startRun(r, date);
+        try {
+            Long created = tx.execute(s -> detectOne(r, date, asOf, runId));
+            finishRun(runId, "SUCCESS", created, null);
+            log.info("Rule {} for {}: {} alert(s)", r.code(), date, created);
+            return created;
+        } catch (RuntimeException e) {
+            finishRun(runId, "FAILED", 0L, e.toString());
+            log.error("Rule {} failed for {}", r.code(), date, e);
+            return -1;
+        }
+    }
+
+    private long detectOne(ActiveRule r, LocalDate date, LocalDate asOf, long runId) {
         Template t = templates.get(r.template());
         if (t == null) {
             throw new IllegalStateException("Unknown template '" + r.template() + "'");
         }
         t.validate(r.config());
-        Template.Built b = t.build(r.config(), date, mst);
+        Template.Built b = t.build(r.config(), asOf, mst);
         Map<String, Object> params = new HashMap<>(b.params());
         params.put("rule_id", r.id());
         params.put("rule_code", r.code());
@@ -89,6 +121,7 @@ public class DetectionService {
         params.put("summary", r.name());
         params.put("d", java.sql.Date.valueOf(date));
         params.put("run_id", runId);
+        params.put("max_evidence", tuning.maxEvidenceTxns());
         params.put("suppress_from", java.sql.Date.valueOf(date.minusDays(r.suppressDays())));
 
         // Re-run: drop this rule's alerts for the date unless they were already handed off (alert_txn cascades).
@@ -105,7 +138,9 @@ public class DetectionService {
                 + " ON CONFLICT (rule_code, account_id, business_date) DO NOTHING", params);
 
         jdbc.update("INSERT INTO " + aml + ".alert_txn (alert_id, transaction_id) SELECT al.alert_id, e.transaction_id FROM ("
-                + b.evidenceSql().replace("{hits}", hits) + ") e JOIN " + aml + ".alert al ON al.rule_code = :rule_code"
+                + "SELECT x.account_id, x.transaction_id FROM (SELECT v.account_id, v.transaction_id, ROW_NUMBER() OVER"
+                + " (PARTITION BY v.account_id ORDER BY v.transaction_id) AS rn FROM (" + b.evidenceSql().replace("{hits}", hits)
+                + ") v) x WHERE x.rn <= :max_evidence) e JOIN " + aml + ".alert al ON al.rule_code = :rule_code"
                 + " AND al.business_date = :d AND al.account_id = e.account_id ON CONFLICT DO NOTHING", params);
         return created;
     }
