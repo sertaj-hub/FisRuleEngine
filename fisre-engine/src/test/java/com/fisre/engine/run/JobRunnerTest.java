@@ -90,4 +90,12 @@ class JobRunnerTest {
         assertThatThrownBy(() -> runner(Fixtures.props("confirm-delivery", "", ""), detection).run(null)).hasMessageContaining("FISRE_DELIVERY_ID");
         assertThatThrownBy(() -> runner(Fixtures.props("import-confirmations", "", ""), detection).run(null)).hasMessageContaining("FISRE_CONFIRM_FILE");
     }
+
+    @Test
+    @Req("REQ-REJ-004")
+    void resolveRejectionNeedsTheNoticeTheActionAndANote() {
+        var detection = mock(com.fisre.engine.detect.DetectionService.class);
+        assertThatThrownBy(() -> runner(Fixtures.props("resolve-rejection", "", ""), detection).run(null))
+                .hasMessageContaining("FISRE_REJECTION_ID").hasMessageContaining("FISRE_RESOLUTION_NOTE");
+    }
 }

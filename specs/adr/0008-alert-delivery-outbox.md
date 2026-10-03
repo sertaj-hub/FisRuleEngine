@@ -12,3 +12,8 @@ Volume is small (300 to 5,000 alerts a day) and all alerts of a date are created
 - **Transport-agnostic.** The delivery tables and views are an outbox. If case management later needs a file, an API or Kafka, a relay job reads the same outbox; detection does not change.
 
 Not chosen: Kafka (no second consumer yet, extra infrastructure), engine-pushed REST (couples the nightly run to the consumer's availability, needs retry and idempotency machinery).
+
+## Addendum: availability and rejections
+
+- **No fixed ready time.** The consumer is notified (`aml_delivery_ready`) as soon as a delivery is published and starts reading and ingesting immediately. The notification is not durable, so a consumer also polls as a safety net. No consumer-side wait or schedule is needed.
+- **Rejections are an audit event with a tracked remediation.** A rejection (reason mandatory) creates a durable notice per delivery, a notification (`aml_alert_rejected`) and a health finding (warning, critical after 24 h). The engine has no always-on process, so these three together are how "the rule engine is told". Operations remediate manually in production and record the outcome with a mandatory note: `FIXED_REREAD` (the consumer re-reads and confirms the full count) or `HANDLED_MANUALLY` (the alerts are excluded from the delivery's control totals so it can close, with the exclusion recorded). Notices are never deleted.

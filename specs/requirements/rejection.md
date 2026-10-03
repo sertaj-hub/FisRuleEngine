@@ -1,0 +1,14 @@
+# Rejections: case management reports alerts it could not ingest
+
+When case management cannot ingest alerts it tells the rule engine, with a reason. The engine keeps an audit record, notifies operations, tracks the **production remediation** until it is resolved, and lets the delivery close once the exceptions are accounted for. Design: ADR-0008 (addendum), `docs/case-management-alert-intake.md` section 8.
+
+The engine is a batch program with no always-on process, so "notifying the engine" means: a **durable rejection notice** (the audit record), a **database notification** that operations tooling can listen to, and a **health finding** raised by the nightly health job.
+
+| ID | Requirement | Status |
+|---|---|---|
+| REQ-REJ-001 | `aml.reject_alerts(alert_ids, reason)` requires a reason and records one **rejection notice** per delivery involved: the delivery, the number of alerts, the reason, the database user and the time, with status `OPEN`; each rejected alert is also listed against the notice. Unknown ids are ignored; if no id is known nothing is recorded. It returns the number of alerts recorded. Rejected alerts stay visible to the consumer. | Implemented |
+| REQ-REJ-002 | Recording a rejection sends a PostgreSQL notification on channel `aml_alert_rejected` (JSON: notice id, delivery id, business date, alert count, reason, rejected by), delivered when the call commits, so that monitoring or paging tools can react at once. | Implemented |
+| REQ-REJ-003 | `aml.v_alert_rejections` (one row per notice) and `aml.v_alert_rejection_items` (one row per rejected alert) give an audit view: who rejected what and why, when, the status, the remediation action and note, who resolved it and when, and for open notices the hours open. | Implemented |
+| REQ-REJ-004 | `aml.resolve_rejection(notice_id, action, note)` closes a notice. The action is `FIXED_REREAD` (the cause was fixed in production, the consumer re-reads the alerts and confirms the full count) or `HANDLED_MANUALLY` (the alerts are handled outside the intake). A note describing the remediation is mandatory; the database user and time are recorded; unknown, already-resolved or invalid requests are refused. The `resolve-rejection` job wraps it. | Implemented |
+| REQ-REJ-005 | When a delivery is confirmed, alerts of notices resolved as `HANDLED_MANUALLY` are excluded from the control totals (count and checksum) the consumer's numbers are compared with, so a consumer that left them out can close the delivery. The number excluded is recorded on the delivery and shown in `aml.v_alert_reconciliation`; every alert of the delivery is marked handed off. A rejection that is open or resolved as `FIXED_REREAD` does not change the totals. | Implemented |
+| REQ-REJ-006 | `health` reports each open rejection notice: `WARN` at first and `CRITICAL` once open longer than `health-rejection-hours` (default 24); a resolved notice is no longer reported. | Implemented |

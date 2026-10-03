@@ -102,6 +102,16 @@ public class JobRunner implements ApplicationRunner {
             }
             return;
         }
+        if (job.equals("resolve-rejection")) {
+            var c = props.confirm();
+            if (c.rejectionId() == null || c.resolutionAction() == null || c.resolutionAction().isBlank()
+                    || c.resolutionNote() == null || c.resolutionNote().isBlank()) {
+                throw new IllegalArgumentException("fisre.job=resolve-rejection needs FISRE_REJECTION_ID, FISRE_RESOLUTION_ACTION (FIXED_REREAD or HANDLED_MANUALLY) "
+                        + "and FISRE_RESOLUTION_NOTE describing the remediation");
+            }
+            log.info("Rejection notice {} resolved: {}", c.rejectionId(), deliveries.resolveRejection(c.rejectionId(), c.resolutionAction(), c.resolutionNote()));
+            return;
+        }
         if (job.equals("import-confirmations")) {
             String file = props.confirm().file();
             if (file == null || file.isBlank()) {
@@ -150,7 +160,7 @@ public class JobRunner implements ApplicationRunner {
         }
         String batchId = props.batchId();
         if (!java.util.Set.of("promote", "clean", "reopen").contains(job)) {
-            throw new IllegalArgumentException("Unknown fisre.job '" + job + "' (expected none, health, promote, promote-loaded, clean, reopen, load-rules, detect, retain, generate, nightly, confirm-delivery or import-confirmations)");
+            throw new IllegalArgumentException("Unknown fisre.job '" + job + "' (expected none, health, promote, promote-loaded, clean, reopen, load-rules, detect, retain, generate, nightly, confirm-delivery, import-confirmations or resolve-rejection)");
         }
         if (batchId == null || batchId.isBlank()) {
             throw new IllegalArgumentException("fisre.job=" + job + " needs fisre.batch-id (FISRE_BATCH_ID)");

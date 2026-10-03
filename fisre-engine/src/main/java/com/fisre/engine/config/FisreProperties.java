@@ -30,16 +30,17 @@ public record FisreProperties(String dbVendor, String job, String batchId, Strin
     public record Tuning(int postingOffsetDays, int duplicateLookbackDays, int retentionMonths, int maxEvidenceTxns,
                          int detectParallelism, int parallelism, int rejectSampleSize, boolean allowNestedLoops,
                          int ruleTimeoutSeconds, int volumeCheckDays, int volumeCheckMinDays, int volumeLowPercent,
-                         int volumeHighPercent, int healthStuckMinutes, int healthAckHours, int healthConfirmHours) {
+                         int volumeHighPercent, int healthStuckMinutes, int healthAckHours, int healthConfirmHours, int healthRejectionHours) {
         public static Tuning defaults() {
-            return new Tuning(1, 3, 13, 200, 4, 2, 100, false, 1800, 7, 3, 50, 200, 120, 24, 12);
+            return new Tuning(1, 3, 13, 200, 4, 2, 100, false, 1800, 7, 3, 50, 200, 120, 24, 12, 24);
         }
     }
 
-    /** Numbers received out of band for the confirm-delivery and import-confirmations jobs (REQ-DLV-011, REQ-DLV-012). */
-    public record Confirm(Long deliveryId, Integer receivedCount, String receivedChecksum, String reference, String file) {
+    /** Inputs of the out-of-band jobs: confirm-delivery, import-confirmations (REQ-DLV-011, 012) and resolve-rejection (REQ-REJ-004). */
+    public record Confirm(Long deliveryId, Integer receivedCount, String receivedChecksum, String reference, String file,
+                          Long rejectionId, String resolutionAction, String resolutionNote) {
         public static Confirm defaults() {
-            return new Confirm(null, null, null, null, null);
+            return new Confirm(null, null, null, null, null, null, null, null);
         }
     }
 

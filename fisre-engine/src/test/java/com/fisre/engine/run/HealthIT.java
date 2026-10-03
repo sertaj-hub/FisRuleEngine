@@ -185,8 +185,31 @@ class HealthIT {
         long alert = jdbc.queryForObject("SELECT alert_id FROM aml.alert", Long.class);
         jdbc.queryForObject("SELECT aml.reject_alerts(ARRAY[?]::bigint[], 'cannot parse')", Integer.class, alert);
         assertThat(findings(Optional.empty()).stream().filter(f -> f.contains("ALERT_REJECTED")).toList()).containsExactly("WARN:ALERT_REJECTED");
+        assertThat(health.check(Optional.empty()).stream().filter(f -> f.check().equals("ALERT_REJECTED")).findFirst().orElseThrow().message())
+                .contains("cannot parse").contains("1 alert(s)").contains("resolve-rejection");
 
-        jdbc.update("UPDATE aml.alert_rejection SET resolved_ts = CURRENT_TIMESTAMP, resolved_by = 'ops'");
+        jdbc.queryForObject("SELECT aml.resolve_rejection((SELECT notice_id FROM aml.alert_rejection_notice), 'FIXED_REREAD', 'customer loaded in case management')", String.class);
+        assertThat(findings(Optional.empty())).isEmpty();
+    }
+
+    @Test
+    @Req("REQ-REJ-006")
+    void anOpenRejectionIsAWarningThenCriticalWhenOverdue_andDisappearsWhenResolved() {
+        rule();
+        long rule = jdbc.queryForObject("SELECT rule_id FROM aml.rule", Long.class);
+        delivery("2026-10-01", "READY", "1 hour");
+        long delivery = jdbc.queryForObject("SELECT delivery_id FROM aml.alert_delivery", Long.class);
+        jdbc.update("INSERT INTO aml.alert (rule_id, rule_code, rule_version, business_date, account_id, customer_id, product_type, summary, evidence, delivery_id)"
+                + " VALUES (?, 'R1', 1, DATE '2026-10-01', 'A1', 'C1', 'DEPOSIT', 's', CAST('{}' AS jsonb), ?)", rule, delivery);
+        long alert = jdbc.queryForObject("SELECT alert_id FROM aml.alert", Long.class);
+        jdbc.queryForObject("SELECT aml.reject_alerts(ARRAY[?]::bigint[], 'unknown customer')", Integer.class, alert);
+
+        assertThat(findings(Optional.empty())).containsExactly("WARN:ALERT_REJECTED");
+
+        jdbc.update("UPDATE aml.alert_rejection_notice SET rejected_ts = CURRENT_TIMESTAMP - INTERVAL '30 hours'");
+        assertThat(findings(Optional.empty())).as("open longer than health-rejection-hours").containsExactly("CRITICAL:ALERT_REJECTED");
+
+        jdbc.queryForObject("SELECT aml.resolve_rejection((SELECT notice_id FROM aml.alert_rejection_notice), 'HANDLED_MANUALLY', 'case created by hand, ticket 99')", String.class);
         assertThat(findings(Optional.empty())).isEmpty();
     }
 }

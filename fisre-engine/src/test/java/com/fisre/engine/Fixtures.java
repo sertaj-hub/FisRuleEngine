@@ -39,7 +39,7 @@ public class Fixtures {
     public void resetAll() {
         jdbc.execute("DROP TRIGGER IF EXISTS fail_acct ON " + mst + ".account");
         purgeAlerts();
-        for (String t : new String[] {aml + ".alert_delivery", aml + ".rule_run", aml + ".rule", aml + ".nightly_run"}) {
+        for (String t : new String[] {aml + ".alert_rejection_notice", aml + ".alert_delivery", aml + ".rule_run", aml + ".rule", aml + ".nightly_run"}) {
             jdbc.update("DELETE FROM " + t);
         }
         for (String p : partitions(mst, "txn")) {

@@ -86,9 +86,14 @@ public class HealthService {
                         + "; case management has nothing to read for that date"));
             }
         });
-        Long rejected = jdbc.queryForObject("SELECT COUNT(DISTINCT alert_id) FROM " + aml + ".alert_rejection WHERE resolved_ts IS NULL", Map.of(), Long.class);
-        if (rejected != null && rejected > 0) {
-            out.add(new Finding("WARN", "ALERT_REJECTED", rejected + " alert(s) were rejected by case management and are not resolved; see aml.alert_rejection"));
+        for (Map<String, Object> n : jdbc.queryForList("SELECT n.notice_id, n.delivery_id, d.business_date, n.alert_count, n.reason, n.rejected_by,"
+                + " round(CAST(extract(epoch FROM (CURRENT_TIMESTAMP - n.rejected_ts)) / 3600 AS numeric), 1) AS hours_open,"
+                + " (n.rejected_ts < CURRENT_TIMESTAMP - make_interval(hours => :h)) AS overdue FROM " + aml + ".alert_rejection_notice n JOIN " + aml
+                + ".alert_delivery d ON d.delivery_id = n.delivery_id WHERE n.status = 'OPEN' ORDER BY n.notice_id", Map.of("h", tuning.healthRejectionHours()))) {
+            out.add(new Finding(Boolean.TRUE.equals(n.get("overdue")) ? "CRITICAL" : "WARN", "ALERT_REJECTED", "Rejection notice " + n.get("notice_id")
+                    + ": " + n.get("alert_count") + " alert(s) of delivery " + n.get("delivery_id") + " (business date " + n.get("business_date")
+                    + ") rejected by " + n.get("rejected_by") + " (" + n.get("reason") + "), open " + n.get("hours_open")
+                    + " hours; remediate in production, then record it with the resolve-rejection job"));
         }
 
         Map<String, Object> backlog = jdbc.queryForMap("SELECT COUNT(*) AS n, MIN(a.created_ts) AS oldest FROM " + aml + ".alert a JOIN " + aml

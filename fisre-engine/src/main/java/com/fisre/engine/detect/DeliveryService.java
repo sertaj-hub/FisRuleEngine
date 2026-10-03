@@ -148,4 +148,10 @@ public class DeliveryService {
         }
         return out;
     }
+
+    /** Records the production remediation of a rejection notice (REQ-REJ-004). Returns the action recorded. */
+    public String resolveRejection(long noticeId, String action, String note) {
+        return jdbc.queryForObject("SELECT " + aml + ".resolve_rejection(:id, :a, :n)", Map.of("id", noticeId, "a", action == null ? "" : action,
+                "n", note == null ? "" : note), String.class);
+    }
 }

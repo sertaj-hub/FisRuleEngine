@@ -31,18 +31,20 @@ A re-run for a date that already has a published delivery never changes it. New 
 
 **`aml.v_alert_events`**: `event_id` (increasing), `alert_id`, `event_type` (`WITHDRAWN`), `reason`, `created_ts`, `rule_code`, `business_date`, `account_id`, `delivery_id`. A `WITHDRAWN` event means a re-run on corrected data no longer produces an alert you already received. Keep the highest `event_id` you processed and read newer ones.
 
-**`aml.v_alert_reconciliation`**: per delivery: `expected_count`, `created_alerts`, `acknowledged_alerts`, `pending_alerts`, `rejected_unresolved`, `withdrawn_alerts`, `received_count`, `checksum`, `received_checksum`, `hours_unconfirmed`. For daily reconciliation by both sides.
+**`aml.v_alert_rejections`** (one row per rejection notice: delivery, business date, alert count, reason, rejected by/at, `status` OPEN or RESOLVED, `resolution_action` `FIXED_REREAD` or `HANDLED_MANUALLY`, `resolution_note`, resolved by/at, `hours_open`) and **`aml.v_alert_rejection_items`** (one row per rejected alert): the audit trail and status of your rejections.
+
+**`aml.v_alert_reconciliation`**: per delivery: `expected_count`, `created_alerts`, `acknowledged_alerts`, `pending_alerts`, `rejected_unresolved`, `withdrawn_alerts`, `received_count`, `checksum`, `received_checksum`, `hours_unconfirmed`, `confirmation_channel`, `confirmation_reference`, `excluded_count` (alerts handled manually and left out of the control totals). For daily reconciliation by both sides.
 
 ## Functions
 
 - **`aml.confirm_delivery(delivery_id bigint, received_count integer, received_checksum text) returns text`**: call it after ingesting a whole delivery. Returns `CONFIRMED` (numbers match; every alert of the delivery is marked handed off) or `MISMATCH` (recorded with your numbers; nothing is marked, the alerts stay visible). Repeating a matching confirmation returns `CONFIRMED` again. An `OPEN` or unknown delivery raises an error.
-- **`aml.reject_alerts(alert_ids bigint[], reason text) returns integer`**: tell us which alerts you could not ingest and why. Recorded with your database user; returns how many were recorded. The engine team follows up (visible in `health` and the reconciliation view).
+- **`aml.reject_alerts(alert_ids bigint[], reason text) returns integer`**: tell us which alerts you could not ingest and why. The reason is **mandatory**. One rejection notice is recorded per delivery involved (audit: who, why, when), a notification `aml_alert_rejected` is sent, and the health job reports it; operations remediate in production and record the outcome. Returns how many alerts were recorded; unknown ids are ignored. Rejected alerts stay visible. See `requirements/rejection.md`.
 - **`aml.compute_alert_checksum(alert_ids bigint[]) returns text`**: the checksum formula, so both sides agree. It is the SHA-256, lowercase hex, of the alert ids sorted ascending and joined with commas (no spaces; an empty list gives the SHA-256 of the empty string).
 - `aml.ack_alerts(alert_ids bigint[]) returns integer` (optional): mark individual alerts handed off while you ingest. `confirm_delivery` makes it unnecessary.
 
 ## Availability signals and out-of-band confirmation
 
-- **Poll** `aml.v_alert_delivery` (always sufficient). Optionally `LISTEN aml_delivery_ready`: the engine sends `{"delivery_id", "business_date", "revision", "alert_count"}` when a delivery is published (a hint, lost if the listener is disconnected).
+- **Notification (primary):** `LISTEN aml_delivery_ready`. The engine sends `{"delivery_id", "business_date", "revision", "alert_count"}` as soon as a delivery is published, and the consumer starts reading at once; there is no fixed ready time. **Poll** `aml.v_alert_delivery` at start-up, after reconnects and on a slow timer as the safety net (a notification is lost if the listener is disconnected).
 - A consumer that cannot call functions can have a delivery confirmed out of band: the `confirm-delivery` job (one delivery, operator, reference required) or `import-confirmations` (CSV file). Same comparison; recorded in `v_alert_reconciliation` as `confirmation_channel` (`DB`, `OPERATOR`, `FILE`) and `confirmation_reference`.
 
 Functional description of the whole intake and reconciliation: `docs/case-management-alert-intake.md`.
@@ -52,7 +54,7 @@ Functional description of the whole intake and reconciliation: `docs/case-manage
 1. `SELECT delivery_id, alert_count, checksum FROM aml.v_alert_delivery WHERE status IN ('READY','MISMATCH') ORDER BY business_date, revision`.
 2. For one delivery: `SELECT alert_id, payload FROM aml.v_alert_export WHERE delivery_id = :id ORDER BY alert_id` (page by `alert_id`). Ingest idempotently, keyed by `alert_id`.
 3. Compute `count` and `checksum` from the alert ids you actually stored, then `SELECT aml.confirm_delivery(:id, :count, :checksum)`. If it returns `MISMATCH`, compare with `v_alert_reconciliation`, re-read, and confirm again.
-4. Alerts you cannot ingest: `SELECT aml.reject_alerts(ARRAY[...], 'reason')`, and do not include them in your count (the delivery will then show a mismatch until the engine team resolves it).
+4. Alerts you cannot ingest: `SELECT aml.reject_alerts(ARRAY[...], 'reason')` (reason mandatory), and do not include them in your count. The delivery then shows a mismatch until operations record the remediation: `FIXED_REREAD` (re-read and confirm the full count) or `HANDLED_MANUALLY` (the alerts are excluded from the control totals and your count matches).
 5. Read `v_alert_events` for events newer than the last `event_id` you processed.
 
-Grants: `SELECT` on the five views and `EXECUTE` on the functions only (`ops/db/postgresql/case_mgmt_grants.sql`).
+Grants: `SELECT` on the delivery, export, events, reconciliation and rejection views and `EXECUTE` on the functions only (`ops/db/postgresql/case_mgmt_grants.sql`).
