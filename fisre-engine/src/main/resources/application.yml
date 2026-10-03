@@ -25,6 +25,7 @@ fisre:
     volume-high-percent: ${FISRE_VOLUME_HIGH_PERCENT:200}
     health-stuck-minutes: ${FISRE_HEALTH_STUCK_MINUTES:120}
     health-ack-hours: ${FISRE_HEALTH_ACK_HOURS:24}
+    health-confirm-hours: ${FISRE_HEALTH_CONFIRM_HOURS:12}   # a published delivery unconfirmed this long is critical
   bench:
     txns: ${FISRE_BENCH_TXNS:1000}
     accounts: ${FISRE_BENCH_ACCOUNTS:100}

@@ -6,7 +6,7 @@
 |---|---|---|
 | REQ-DET-001 | For each active rule, each account that hits gets one alert for the business date, addressed to the account's primary customer, with the rule code and version, a JSON evidence document and the list of transactions behind it (each link carries the posting date so details can be read from one partition). | Implemented |
 | REQ-DET-002 | Detection for a business date is refused unless that date has a live (promoted) batch. | Implemented |
-| REQ-DET-003 | Re-running a business date replaces the rule's alerts that have not been handed off; there are never two alerts for the same rule, account and date. | Implemented |
+| REQ-DET-003 | Re-running a business date replaces the rule's alerts of the delivery that is still `OPEN`; alerts of a published delivery are never changed (REQ-DLV-006). There are never two alerts for the same rule, account and date. | Implemented |
 | REQ-DET-004 | An alert already handed off to case management is never deleted or duplicated by a re-run. | Implemented |
 | REQ-DET-005 | With `suppress_days` = N, an account that hit the same rule within the previous N days gets no new alert. | Implemented |
 | REQ-DET-006 | A rule that fails is recorded as FAILED in `aml.rule_run` and does not stop the other rules; the job exits non-zero at the end. | Implemented |

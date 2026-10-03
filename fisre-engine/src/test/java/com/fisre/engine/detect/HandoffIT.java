@@ -54,6 +54,8 @@ class HandoffIT {
     @Req("REQ-HND-001")
     void viewShowsUnsentAlertsWithASelfContainedPayload() {
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM aml.v_alert_export", Long.class)).isEqualTo(1);
+        assertThat(payload("payload->'delivery'->>'revision'")).isEqualTo("1");
+        assertThat(payload("payload->'delivery'->>'id'")).isEqualTo(payload("delivery_id::text"));
         assertThat(payload("payload->'rule'->>'code'")).isEqualTo("T_RULE");
         assertThat(payload("payload->'rule'->>'name'")).isEqualTo("Cash over $100 in a day");
         assertThat(payload("payload->'rule'->>'version'")).isEqualTo("1");
@@ -93,7 +95,7 @@ class HandoffIT {
     void theViewColumnsAreAStableContract() {
         assertThat(jdbc.queryForList("SELECT column_name FROM information_schema.columns WHERE table_schema = 'aml' AND table_name = 'v_alert_export'"
                 + " ORDER BY ordinal_position", String.class))
-                .containsExactly("alert_id", "rule_code", "business_date", "account_id", "customer_id", "product_type", "created_ts", "payload");
+                .containsExactly("alert_id", "delivery_id", "rule_code", "business_date", "account_id", "customer_id", "product_type", "created_ts", "payload");
     }
 
     @Test

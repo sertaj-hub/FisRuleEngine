@@ -10,4 +10,5 @@ Batch AML detection platform (US BSA; cards, loans, deposits). Alerts will feed 
 - Batch model: a batch (one business date) succeeds or fails as a whole (ADR-0003, `specs/requirements/batch.md`).
 - Rules are configured templates, not code (ADR-0004): a new rule is a YAML file in `specs/rules/` with test scenarios; `RuleSpecIT` runs them. No per-rule severity.
 - Hardening (ADR-0007): one mutating job at a time (`JobLock`), statement and rule timeouts, handed-off alerts are immutable, schema names are validated, config values are always bound parameters, the app refuses the default DB password. Run jars locally with `FISRE_ALLOW_DEFAULT_CREDENTIALS=true`.
+- Alert delivery (ADR-0008): alerts go to case management as one reconciled delivery per business date, never one by one; a published delivery is frozen, corrections are new revisions or `WITHDRAWN` events; the consumer contract is `aml.v_alert_*` plus `confirm_delivery`/`reject_alerts` (`specs/data-contract/alert-export.md`).
 - Out of scope: sanctions/watchlist, KYC scoring, real-time detection.

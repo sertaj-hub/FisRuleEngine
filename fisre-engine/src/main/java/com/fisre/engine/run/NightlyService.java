@@ -1,5 +1,6 @@
 package com.fisre.engine.run;
 
+import com.fisre.engine.detect.DeliveryService;
 import com.fisre.engine.detect.DetectionService;
 import com.fisre.engine.promotion.BatchRepository;
 import com.fisre.engine.promotion.BatchService;
@@ -45,15 +46,17 @@ public class NightlyService {
     private final BatchRepository batchRepo;
     private final DetectionService detection;
     private final RetentionService retention;
+    private final DeliveryService deliveries;
     private final String aml;
 
     public NightlyService(NamedParameterJdbcTemplate jdbc, BatchService batches, BatchRepository batchRepo,
-                          DetectionService detection, RetentionService retention, FisreProperties props) {
+                          DetectionService detection, RetentionService retention, DeliveryService deliveries, FisreProperties props) {
         this.jdbc = jdbc;
         this.batches = batches;
         this.batchRepo = batchRepo;
         this.detection = detection;
         this.retention = retention;
+        this.deliveries = deliveries;
         this.aml = props.schemas().aml();
     }
 
@@ -97,7 +100,7 @@ public class NightlyService {
 
     private Outcome detect(LocalDate date) {
         DetectionService.Result r = detection.detect(date);
-        return r.rulesFailed() == 0 ? Outcome.ok()
+        return r.rulesFailed() == 0 ? new Outcome("SUCCESS", deliveries.describeLatest(date).orElse(null))
                 : Outcome.failed(r.rulesFailed() + " of " + r.rulesRun() + " rule(s) failed; see aml.rule_run");
     }
 

@@ -30,9 +30,9 @@ public record FisreProperties(String dbVendor, String job, String batchId, Strin
     public record Tuning(int postingOffsetDays, int duplicateLookbackDays, int retentionMonths, int maxEvidenceTxns,
                          int detectParallelism, int parallelism, int rejectSampleSize, boolean allowNestedLoops,
                          int ruleTimeoutSeconds, int volumeCheckDays, int volumeCheckMinDays, int volumeLowPercent,
-                         int volumeHighPercent, int healthStuckMinutes, int healthAckHours) {
+                         int volumeHighPercent, int healthStuckMinutes, int healthAckHours, int healthConfirmHours) {
         public static Tuning defaults() {
-            return new Tuning(1, 3, 13, 200, 4, 2, 100, false, 1800, 7, 3, 50, 200, 120, 24);
+            return new Tuning(1, 3, 13, 200, 4, 2, 100, false, 1800, 7, 3, 50, 200, 120, 24, 12);
         }
     }
 

@@ -45,9 +45,10 @@ public class DetectionService {
     private final String aml;
     private final FisreProperties.Tuning tuning;
     private final PartitionCatalog catalog;
+    private final DeliveryService deliveries;
 
     public DetectionService(NamedParameterJdbcTemplate jdbc, TransactionTemplate tx, Dialect dialect,
-                            List<Template> templates, FisreProperties props, PartitionCatalog catalog) {
+                            List<Template> templates, FisreProperties props, PartitionCatalog catalog, DeliveryService deliveries) {
         this.jdbc = jdbc;
         this.tx = tx;
         this.dialect = dialect;
@@ -56,6 +57,7 @@ public class DetectionService {
         this.aml = props.schemas().aml();
         this.tuning = props.tuning();
         this.catalog = catalog;
+        this.deliveries = deliveries;
     }
 
     public Result detect(LocalDate date) {
@@ -71,11 +73,12 @@ public class DetectionService {
                     gaps.size(), asOf, gaps.stream().limit(10).toList());
         }
         List<ActiveRule> rules = activeRules();
+        long deliveryId = deliveries.openFor(date);
         ExecutorService pool = Executors.newFixedThreadPool(Math.max(1, Math.min(tuning.detectParallelism(), Math.max(1, rules.size()))));
         List<Future<Long>> futures = new ArrayList<>();
         try {
             for (ActiveRule r : rules) {
-                futures.add(pool.submit(() -> runRule(r, date, asOf)));
+                futures.add(pool.submit(() -> runRule(r, date, asOf, deliveryId)));
             }
             int failed = 0;
             long alerts = 0;
@@ -94,6 +97,11 @@ public class DetectionService {
                     throw new IllegalStateException(e);
                 }
             }
+            if (failed == 0) {
+                deliveries.publish(deliveryId);
+            } else {
+                log.warn("{} rule(s) failed for {}: its delivery stays OPEN (invisible to case management) until a run succeeds", failed, date);
+            }
             return new Result(rules.size(), failed, alerts);
         } finally {
             pool.shutdown();
@@ -101,10 +109,10 @@ public class DetectionService {
     }
 
     /** Runs one rule in its own transaction. Returns alerts created, or -1 if the rule failed (recorded in aml.rule_run). */
-    private long runRule(ActiveRule r, LocalDate date, LocalDate asOf) {
+    private long runRule(ActiveRule r, LocalDate date, LocalDate asOf, long deliveryId) {
         long runId = startRun(r, date);
         try {
-            Long created = tx.execute(s -> detectOne(r, date, asOf, runId));
+            Long created = tx.execute(s -> detectOne(r, date, asOf, runId, deliveryId));
             finishRun(runId, "SUCCESS", created, null);
             log.info("Rule {} for {}: {} alert(s)", r.code(), date, created);
             return created;
@@ -115,7 +123,7 @@ public class DetectionService {
         }
     }
 
-    private long detectOne(ActiveRule r, LocalDate date, LocalDate asOf, long runId) {
+    private long detectOne(ActiveRule r, LocalDate date, LocalDate asOf, long runId, long deliveryId) {
         Template t = templates.get(r.template());
         if (t == null) {
             throw new IllegalStateException("Unknown template '" + r.template() + "'");
@@ -135,28 +143,42 @@ public class DetectionService {
         params.put("summary", r.name());
         params.put("d", java.sql.Date.valueOf(date));
         params.put("run_id", runId);
+        params.put("delivery_id", deliveryId);
         params.put("max_evidence", tuning.maxEvidenceTxns());
         params.put("suppress_from", java.sql.Date.valueOf(date.minusDays(r.suppressDays())));
 
-        // Re-run: drop this rule's alerts for the date unless they were already handed off (alert_txn cascades).
-        jdbc.update("DELETE FROM " + aml + ".alert WHERE rule_code = :rule_code AND business_date = :d AND handed_off_ts IS NULL", params);
+        // Re-run: replace this rule's alerts of the delivery that is still OPEN (alert_txn cascades). Alerts of a published
+        // delivery are never touched; new hits go to this open delivery, which is the next revision (REQ-DLV-006).
+        jdbc.update("DELETE FROM " + aml + ".alert WHERE rule_code = :rule_code AND business_date = :d AND handed_off_ts IS NULL"
+                + " AND delivery_id = :delivery_id", params);
 
-        String hits = "(" + b.hitsSql() + ") h";
+        // The hits are computed once into a temporary table; alerts, evidence and withdrawals all read it.
+        jdbc.getJdbcOperations().execute("CREATE TEMP TABLE rule_hits (account_id VARCHAR(40), customer_id VARCHAR(40), product_type VARCHAR(20),"
+                + " evidence JSONB) ON COMMIT DROP");
+        jdbc.update("INSERT INTO rule_hits SELECT h.account_id, h.customer_id, h.product_type, h.evidence FROM (" + b.hitsSql() + ") h", params);
+
         String suppression = r.suppressDays() > 0
                 ? " WHERE NOT EXISTS (SELECT 1 FROM " + aml + ".alert p WHERE p.rule_code = :rule_code AND p.account_id = h.account_id"
                 + " AND p.business_date >= :suppress_from AND p.business_date < :d)"
                 : " WHERE 1 = 1";
         int created = jdbc.update("INSERT INTO " + aml + ".alert (rule_id, rule_code, rule_version, business_date, account_id, customer_id,"
-                + " product_type, summary, evidence, run_id, customer_snapshot) SELECT :rule_id, :rule_code, :rule_version, :d, h.account_id, h.customer_id,"
+                + " product_type, summary, evidence, run_id, customer_snapshot, delivery_id) SELECT :rule_id, :rule_code, :rule_version, :d, h.account_id, h.customer_id,"
                 + " h.product_type, :summary, h.evidence, :run_id, jsonb_build_object('name', c.full_name, 'type', c.customer_type,"
-                + " 'country', c.country_code, 'state', c.state_code) FROM " + hits + " LEFT JOIN " + mst + ".customer c ON c.customer_id = h.customer_id" + suppression
+                + " 'country', c.country_code, 'state', c.state_code), :delivery_id FROM rule_hits h LEFT JOIN " + mst + ".customer c ON c.customer_id = h.customer_id" + suppression
                 + " ON CONFLICT (rule_code, account_id, business_date) DO NOTHING", params);
 
         jdbc.update("INSERT INTO " + aml + ".alert_txn (alert_id, transaction_id, posting_date) SELECT al.alert_id, e.transaction_id, e.posting_date FROM ("
                 + "SELECT x.account_id, x.transaction_id, x.posting_date FROM (SELECT v.account_id, v.transaction_id, v.posting_date, ROW_NUMBER() OVER"
-                + " (PARTITION BY v.account_id ORDER BY v.transaction_id) AS rn FROM (" + b.evidenceSql().replace("{hits}", hits)
+                + " (PARTITION BY v.account_id ORDER BY v.transaction_id) AS rn FROM (" + b.evidenceSql().replace("{hits}", "rule_hits h")
                 + ") v) x WHERE x.rn <= :max_evidence) e JOIN " + aml + ".alert al ON al.rule_code = :rule_code"
-                + " AND al.business_date = :d AND al.account_id = e.account_id AND al.handed_off_ts IS NULL ON CONFLICT DO NOTHING", params);
+                + " AND al.business_date = :d AND al.account_id = e.account_id AND al.delivery_id = :delivery_id ON CONFLICT DO NOTHING", params);
+
+        // Alerts already published for this date that this run no longer produces: tell the consumer (REQ-DLV-007).
+        jdbc.update("INSERT INTO " + aml + ".alert_event (alert_id, event_type, reason) SELECT a.alert_id, 'WITHDRAWN',"
+                + " 'not produced when business date ' || CAST(:d AS text) || ' was re-run' FROM " + aml + ".alert a JOIN " + aml
+                + ".alert_delivery d ON d.delivery_id = a.delivery_id WHERE a.rule_code = :rule_code AND a.business_date = :d"
+                + " AND d.status IN ('READY', 'CONFIRMED', 'MISMATCH') AND NOT EXISTS (SELECT 1 FROM rule_hits h WHERE h.account_id = a.account_id)"
+                + " ON CONFLICT (alert_id, event_type) DO NOTHING", params);
         return created;
     }
 

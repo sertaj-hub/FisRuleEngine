@@ -9,7 +9,7 @@ bank ETL ─► stg (customer, account, txn, tagged batch_id) ─[promote batch]
 A **batch** is one business date and succeeds or fails as a whole. The 1 am batch for business date D carries the transactions posted on **D-1** (`FISRE_POSTING_OFFSET_DAYS`, default 1). On success its staging partitions are dropped; on failure
 fix stg and `reopen`, or `clean` and reload under a new batch id. The ETL registers a batch by inserting into `aml.load_batch`, which creates its staging partitions `<table>_b<batch_seq>`; load straight into those for speed. Protocol: [`specs/data-contract/batch-protocol.md`](specs/data-contract/batch-protocol.md).
 
-Status: Phases 0 to 5 done and hardened (foundation, batch promotion, rule framework, nine rules, partitioned scale design, nightly run, database handoff to case management, safety limits, audit, health checks). Designed for 10M transactions a day and 13 months of history ([ADR-0005](specs/adr/0005-scale-design.md)).
+Status: Phases 0 to 5 done and hardened (foundation, batch promotion, rule framework, nine rules, partitioned scale design, nightly run, reconciled database delivery to case management, safety limits, audit, health checks). Designed for 10M transactions a day and 13 months of history ([ADR-0005](specs/adr/0005-scale-design.md)).
 Specs: [`specs/`](specs/README.md). Decisions: [`specs/adr/`](specs/adr).
 
 ## Run
@@ -49,7 +49,7 @@ scenarios, which the build runs against the database. Reference: [`specs/data-co
 
 ## Case management
 
-Case management reads alerts from the database: view `aml.v_alert_export` (one self-contained JSON payload per unsent alert) and function `aml.ack_alerts(ids)` to confirm pickup. Contract: [`specs/data-contract/alert-export.md`](specs/data-contract/alert-export.md), ADR-0006. Day-to-day operation and failure handling: [`ops/RUNBOOK.md`](ops/RUNBOOK.md).
+Case management reads alerts from the database. Each business date is one **delivery**, published when detection finishes, with control totals (count, per-rule counts, checksum). The consumer ingests it from `aml.v_alert_export` (one self-contained JSON payload per alert) and reconciles with `aml.confirm_delivery(id, count, checksum)`; it can `aml.reject_alerts(...)` and read `WITHDRAWN` events. Contract: [`specs/data-contract/alert-export.md`](specs/data-contract/alert-export.md), ADR-0008. Day-to-day operation and failure handling: [`ops/RUNBOOK.md`](ops/RUNBOOK.md).
 
 ## Test
 

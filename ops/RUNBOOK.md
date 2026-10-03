@@ -8,7 +8,7 @@ All commands run the same jar: `java -jar fisre-engine.jar` with `FISRE_JOB=<job
 2. The ETL loads them (COPY straight into the partitions is fastest), then sets `status = 'LOADED'`.
 3. The scheduler runs one command: `FISRE_JOB=nightly FISRE_BATCH_ID=<id> FISRE_BUSINESS_DATE=D java -jar fisre-engine.jar`
    It promotes, detects and applies retention, in that order, and stops at the first failing step. Progress: `SELECT * FROM aml.nightly_run WHERE business_date = DATE 'D' ORDER BY run_id`.
-4. Case management reads `aml.v_alert_export` and calls `aml.ack_alerts(ids)` (see `specs/data-contract/alert-export.md`, grants in `ops/db/postgresql/case_mgmt_grants.sql`).
+4. Detection publishes **one delivery for the business date** when every rule has succeeded (`READY`, with alert count, count per rule and checksum; zero alerts is still published). Case management reads `aml.v_alert_delivery`, ingests the delivery's alerts from `aml.v_alert_export`, and calls `aml.confirm_delivery(id, count, checksum)`; the engine answers `CONFIRMED` or `MISMATCH`. Contract: `specs/data-contract/alert-export.md`; grants: `ops/db/postgresql/case_mgmt_grants.sql`; design: ADR-0008.
 
 Re-running `nightly` for the same batch after a later step failed is safe: promote is skipped, detect replaces unsent alerts, handed-off alerts are never touched.
 
@@ -21,7 +21,11 @@ Re-running `nightly` for the same batch after a later step failed is safe: promo
 | Crashed run, batch stuck in `PROMOTING` | `aml.load_batch` | `FISRE_JOB=reopen`, then `nightly` |
 | DETECT failed: "rule(s) failed" | `SELECT * FROM aml.rule_run WHERE status = 'FAILED'` (error_msg) | Fix the rule spec, `load-rules`, rerun `detect` for the date |
 | "No live (promoted) batch for business date" | `aml.load_batch` | Detection needs a promoted batch for that date |
-| A corrected delivery for a past date | n/a | Load it as a new batch for the same date and promote it; it replaces the old day's transactions. Re-run `detect` for that date (alerts already handed off stay) |
+| DELIVERY_NOT_CONFIRMED (health) | `SELECT * FROM aml.v_alert_reconciliation ORDER BY business_date DESC` | A published delivery has not been confirmed within `FISRE_HEALTH_CONFIRM_HOURS` (12). Ask case management whether they ingested it; they confirm, or reject alerts with a reason |
+| DELIVERY_MISMATCH (health) | `v_alert_reconciliation`: `expected_count`, `received_count`, `checksum`, `received_checksum` | Counts differ: they missed or double-loaded alerts. Same count, different checksum: different alerts. They read the delivery again (it stays visible) and confirm again |
+| ALERT_REJECTED (health) | `SELECT * FROM aml.alert_rejection WHERE resolved_ts IS NULL` | Case management could not ingest these alerts. Fix the cause (usually a data issue such as an unknown customer), tell them to re-read, then `UPDATE aml.alert_rejection SET resolved_ts = CURRENT_TIMESTAMP, resolved_by = current_user WHERE ...` |
+| DELIVERY_NOT_PUBLISHED, delivery stays `OPEN` | `aml.rule_run` for the date (a rule failed) | Fix the rule, `load-rules`, rerun `detect`; the same delivery is then published. Nothing of an OPEN delivery is visible to case management |
+| A corrected delivery for a past date | n/a | Load it as a new batch for the same date and promote it; it replaces the old day's transactions. Re-run `detect` for that date: published alerts never change; new hits become the next revision of that date's delivery, and alerts that no longer hit are reported to case management as `WITHDRAWN` events (`aml.v_alert_events`) |
 
 ## One-off jobs
 

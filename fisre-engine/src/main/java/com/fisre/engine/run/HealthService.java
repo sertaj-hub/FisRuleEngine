@@ -67,8 +67,33 @@ public class HealthService {
             }
         });
 
-        Map<String, Object> backlog = jdbc.queryForMap("SELECT COUNT(*) AS n, MIN(created_ts) AS oldest FROM " + aml + ".alert WHERE handed_off_ts IS NULL"
-                + " AND created_ts < CURRENT_TIMESTAMP - make_interval(hours => :h)", Map.of("h", tuning.healthAckHours()));
+        for (Map<String, Object> m : jdbc.queryForList("SELECT delivery_id, business_date, revision FROM " + aml + ".alert_delivery WHERE status = 'MISMATCH'"
+                + " ORDER BY delivery_id", Map.of())) {
+            out.add(new Finding("CRITICAL", "DELIVERY_MISMATCH", "Delivery " + m.get("delivery_id") + " (business date " + m.get("business_date")
+                    + ", revision " + m.get("revision") + ") does not reconcile with case management; see aml.v_alert_reconciliation"));
+        }
+        for (Map<String, Object> m : jdbc.queryForList("SELECT delivery_id, business_date, round(CAST(extract(epoch FROM (CURRENT_TIMESTAMP - ready_ts)) / 3600 AS numeric), 1) AS hours FROM "
+                + aml + ".alert_delivery WHERE status = 'READY' AND ready_ts < CURRENT_TIMESTAMP - make_interval(hours => :h) ORDER BY delivery_id",
+                Map.of("h", tuning.healthConfirmHours()))) {
+            out.add(new Finding("CRITICAL", "DELIVERY_NOT_CONFIRMED", "Delivery " + m.get("delivery_id") + " (business date " + m.get("business_date")
+                    + ") has been READY for " + m.get("hours") + " hours without confirmation from case management"));
+        }
+        businessDate.ifPresent(d -> {
+            Long published = jdbc.queryForObject("SELECT COUNT(*) FROM " + aml + ".alert_delivery WHERE business_date = :d AND status IN ('READY', 'CONFIRMED', 'MISMATCH')",
+                    Map.of("d", java.sql.Date.valueOf(d)), Long.class);
+            if (published == null || published == 0) {
+                out.add(new Finding("CRITICAL", "DELIVERY_NOT_PUBLISHED", "No alert delivery has been published for business date " + d
+                        + "; case management has nothing to read for that date"));
+            }
+        });
+        Long rejected = jdbc.queryForObject("SELECT COUNT(DISTINCT alert_id) FROM " + aml + ".alert_rejection WHERE resolved_ts IS NULL", Map.of(), Long.class);
+        if (rejected != null && rejected > 0) {
+            out.add(new Finding("WARN", "ALERT_REJECTED", rejected + " alert(s) were rejected by case management and are not resolved; see aml.alert_rejection"));
+        }
+
+        Map<String, Object> backlog = jdbc.queryForMap("SELECT COUNT(*) AS n, MIN(a.created_ts) AS oldest FROM " + aml + ".alert a JOIN " + aml
+                + ".alert_delivery d ON d.delivery_id = a.delivery_id WHERE a.handed_off_ts IS NULL AND d.status IN ('READY', 'MISMATCH')"
+                + " AND a.created_ts < CURRENT_TIMESTAMP - make_interval(hours => :h)", Map.of("h", tuning.healthAckHours()));
         if (((Number) backlog.get("n")).longValue() > 0) {
             out.add(new Finding("WARN", "ALERT_BACKLOG", backlog.get("n") + " alert(s) older than " + tuning.healthAckHours()
                     + " hours have not been acknowledged by case management (oldest created " + backlog.get("oldest") + ")"));

@@ -90,20 +90,27 @@ class DetectionIT {
 
     @Test
     @Req("REQ-DET-003")
-    void rerunReplacesUnsentAlertsWithoutDuplicates() throws IOException {
+    void rerunReplacesTheAlertsOfTheDeliveryThatIsStillOpen_withoutDuplicates() throws IOException {
         fx.liveBatch("B1", "2026-10-01");
         fx.account("A1", "DEPOSIT", "C1", "2020-01-01");
         cashDay("T1", "2026-09-30", "150");
         loadRule(0);
+        // a broken rule keeps the delivery OPEN, so the good rule's alerts are still replaceable
+        jdbc.update("INSERT INTO " + aml + ".rule (rule_code, version, name, template_code, status, config) VALUES"
+                + " ('A_BROKEN', 1, 'Broken', 'NO_SUCH_TEMPLATE', 'ACTIVE', CAST('{}' AS jsonb))");
 
         detection.detect(D);
         detection.detect(D);
-        assertThat(alerts()).isEqualTo(1);
+        assertThat(alerts()).as("replaced, not duplicated").isEqualTo(1);
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM " + aml + ".alert_txn", Long.class)).isEqualTo(1);
+        assertThat(jdbc.queryForObject("SELECT status FROM " + aml + ".alert_delivery", String.class)).isEqualTo("OPEN");
 
         jdbc.update("DELETE FROM " + props.schemas().mst() + ".txn WHERE transaction_id = 'T1'");   // corrected data no longer hits
+        jdbc.update("UPDATE " + aml + ".rule SET status = 'RETIRED' WHERE rule_code = 'A_BROKEN'");
         detection.detect(D);
+
         assertThat(alerts()).isZero();
+        assertThat(jdbc.queryForList("SELECT status || ':' || alert_count FROM " + aml + ".alert_delivery", String.class)).containsExactly("READY:0");
     }
 
     @Test
