@@ -1,0 +1,82 @@
+{
+  "rule": {
+    "code": "CARD_CASH_ADVANCE_VELOCITY",
+    "name": "Card cash advance velocity",
+    "version": 1
+  },
+  "account": {
+    "id": "CRD-100100",
+    "product_type": "CARD"
+  },
+  "summary": "Card cash advance velocity",
+  "alert_id": 1,
+  "customer": {
+    "id": "CUS-5000",
+    "name": "Alex Morgan",
+    "type": "INDIVIDUAL",
+    "state": "NY",
+    "country": "US"
+  },
+  "delivery": {
+    "id": 1,
+    "revision": 1
+  },
+  "evidence": {
+    "total": 2000.0,
+    "min_sum": 1500,
+    "min_count": 3,
+    "txn_count": 4,
+    "window_days": 7
+  },
+  "transactions": [
+    {
+      "amount": 500.0,
+      "txn_ts": "2026-09-25T12:00:00",
+      "channel": null,
+      "currency": "USD",
+      "txn_type": "CARD_CASH_ADVANCE",
+      "direction": "DEBIT",
+      "posting_date": "2026-09-25",
+      "transaction_id": "TX100001",
+      "counterparty_name": null,
+      "counterparty_country": null
+    },
+    {
+      "amount": 500.0,
+      "txn_ts": "2026-09-27T12:00:00",
+      "channel": null,
+      "currency": "USD",
+      "txn_type": "CARD_CASH_ADVANCE",
+      "direction": "DEBIT",
+      "posting_date": "2026-09-27",
+      "transaction_id": "TX100002",
+      "counterparty_name": null,
+      "counterparty_country": null
+    },
+    {
+      "amount": 500.0,
+      "txn_ts": "2026-09-29T12:00:00",
+      "channel": null,
+      "currency": "USD",
+      "txn_type": "CARD_CASH_ADVANCE",
+      "direction": "DEBIT",
+      "posting_date": "2026-09-29",
+      "transaction_id": "TX100003",
+      "counterparty_name": null,
+      "counterparty_country": null
+    },
+    {
+      "amount": 500.0,
+      "txn_ts": "2026-09-30T12:00:00",
+      "channel": null,
+      "currency": "USD",
+      "txn_type": "CARD_CASH_ADVANCE",
+      "direction": "DEBIT",
+      "posting_date": "2026-09-30",
+      "transaction_id": "TX100004",
+      "counterparty_name": null,
+      "counterparty_country": null
+    }
+  ],
+  "business_date": "2026-10-01"
+}

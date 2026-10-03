@@ -1,0 +1,48 @@
+{
+  "rule": {
+    "code": "NEW_COUNTERPARTY_COUNTRY",
+    "name": "First wire to a new counterparty country",
+    "version": 1
+  },
+  "account": {
+    "id": "DEP-100160",
+    "product_type": "DEPOSIT"
+  },
+  "summary": "First wire to a new counterparty country",
+  "alert_id": 11,
+  "customer": {
+    "id": "CUS-5060",
+    "name": "Harbor Point Imports LLC",
+    "type": "ORGANIZATION",
+    "state": "CA",
+    "country": "US"
+  },
+  "delivery": {
+    "id": 1,
+    "revision": 1
+  },
+  "evidence": {
+    "total": 3000.0,
+    "attribute": "counterparty_country",
+    "txn_count": 1,
+    "new_values": [
+      "BR"
+    ],
+    "baseline_days": 30
+  },
+  "transactions": [
+    {
+      "amount": 3000.0,
+      "txn_ts": "2026-09-30T12:00:00",
+      "channel": null,
+      "currency": "USD",
+      "txn_type": "WIRE_OUT",
+      "direction": "DEBIT",
+      "posting_date": "2026-09-30",
+      "transaction_id": "TX106007",
+      "counterparty_name": null,
+      "counterparty_country": "BR"
+    }
+  ],
+  "business_date": "2026-10-01"
+}

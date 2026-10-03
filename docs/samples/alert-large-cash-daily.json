@@ -1,0 +1,58 @@
+{
+  "rule": {
+    "code": "LARGE_CASH_DAILY",
+    "name": "Large cash activity in one day",
+    "version": 1
+  },
+  "account": {
+    "id": "DEP-100140",
+    "product_type": "DEPOSIT"
+  },
+  "summary": "Large cash activity in one day",
+  "alert_id": 7,
+  "customer": {
+    "id": "CUS-5040",
+    "name": "Sofia Alvarez",
+    "type": "INDIVIDUAL",
+    "state": "FL",
+    "country": "US"
+  },
+  "delivery": {
+    "id": 1,
+    "revision": 1
+  },
+  "evidence": {
+    "total": 11000.0,
+    "min_sum": 10000.01,
+    "min_count": 1,
+    "txn_count": 2,
+    "window_days": 1
+  },
+  "transactions": [
+    {
+      "amount": 6000.0,
+      "txn_ts": "2026-09-30T12:00:00",
+      "channel": null,
+      "currency": "USD",
+      "txn_type": "CASH_DEPOSIT",
+      "direction": "CREDIT",
+      "posting_date": "2026-09-30",
+      "transaction_id": "TX104001",
+      "counterparty_name": null,
+      "counterparty_country": null
+    },
+    {
+      "amount": 5000.0,
+      "txn_ts": "2026-09-30T12:00:00",
+      "channel": null,
+      "currency": "USD",
+      "txn_type": "CASH_DEPOSIT",
+      "direction": "CREDIT",
+      "posting_date": "2026-09-30",
+      "transaction_id": "TX104002",
+      "counterparty_name": null,
+      "counterparty_country": null
+    }
+  ],
+  "business_date": "2026-10-01"
+}

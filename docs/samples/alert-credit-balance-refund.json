@@ -1,0 +1,57 @@
+{
+  "rule": {
+    "code": "CREDIT_BALANCE_REFUND",
+    "name": "Credit balance refund after payments",
+    "version": 1
+  },
+  "account": {
+    "id": "CRD-100110",
+    "product_type": "CARD"
+  },
+  "summary": "Credit balance refund after payments",
+  "alert_id": 3,
+  "customer": {
+    "id": "CUS-5010",
+    "name": "Priya Natarajan",
+    "type": "INDIVIDUAL",
+    "state": "CA",
+    "country": "US"
+  },
+  "delivery": {
+    "id": 1,
+    "revision": 1
+  },
+  "evidence": {
+    "then_total": 4000.0,
+    "first_total": 5000.0,
+    "within_days": 30,
+    "then_pct_of_first": 80.0
+  },
+  "transactions": [
+    {
+      "amount": 5000.0,
+      "txn_ts": "2026-09-15T12:00:00",
+      "channel": null,
+      "currency": "USD",
+      "txn_type": "CARD_PAYMENT",
+      "direction": "CREDIT",
+      "posting_date": "2026-09-15",
+      "transaction_id": "TX101001",
+      "counterparty_name": null,
+      "counterparty_country": null
+    },
+    {
+      "amount": 4000.0,
+      "txn_ts": "2026-09-30T12:00:00",
+      "channel": null,
+      "currency": "USD",
+      "txn_type": "CREDIT_BALANCE_REFUND",
+      "direction": "DEBIT",
+      "posting_date": "2026-09-30",
+      "transaction_id": "TX101002",
+      "counterparty_name": null,
+      "counterparty_country": null
+    }
+  ],
+  "business_date": "2026-10-01"
+}

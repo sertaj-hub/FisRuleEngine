@@ -1,0 +1,44 @@
+{
+  "rule": {
+    "code": "DORMANT_REACTIVATION",
+    "name": "Dormant deposit account suddenly active",
+    "version": 1
+  },
+  "account": {
+    "id": "DEP-100130",
+    "product_type": "DEPOSIT"
+  },
+  "summary": "Dormant deposit account suddenly active",
+  "alert_id": 4,
+  "customer": {
+    "id": "CUS-5030",
+    "name": "Mei Lin Zhang",
+    "type": "INDIVIDUAL",
+    "state": "IL",
+    "country": "US"
+  },
+  "delivery": {
+    "id": 1,
+    "revision": 1
+  },
+  "evidence": {
+    "total": 8000.0,
+    "dormant_days": 180,
+    "last_activity": "2025-09-01"
+  },
+  "transactions": [
+    {
+      "amount": 8000.0,
+      "txn_ts": "2026-09-30T12:00:00",
+      "channel": null,
+      "currency": "USD",
+      "txn_type": "WIRE_IN",
+      "direction": "CREDIT",
+      "posting_date": "2026-09-30",
+      "transaction_id": "TX103002",
+      "counterparty_name": null,
+      "counterparty_country": null
+    }
+  ],
+  "business_date": "2026-10-01"
+}

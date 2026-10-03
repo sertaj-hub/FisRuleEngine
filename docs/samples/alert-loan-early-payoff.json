@@ -1,0 +1,57 @@
+{
+  "rule": {
+    "code": "LOAN_EARLY_PAYOFF",
+    "name": "Loan paid off shortly after disbursement",
+    "version": 1
+  },
+  "account": {
+    "id": "LN-100150",
+    "product_type": "LOAN"
+  },
+  "summary": "Loan paid off shortly after disbursement",
+  "alert_id": 9,
+  "customer": {
+    "id": "CUS-5050",
+    "name": "Marcus Bell",
+    "type": "INDIVIDUAL",
+    "state": "NY",
+    "country": "US"
+  },
+  "delivery": {
+    "id": 1,
+    "revision": 1
+  },
+  "evidence": {
+    "then_total": 20500.0,
+    "first_total": 20000.0,
+    "within_days": 90,
+    "then_pct_of_first": 102.5
+  },
+  "transactions": [
+    {
+      "amount": 20000.0,
+      "txn_ts": "2026-08-21T12:00:00",
+      "channel": null,
+      "currency": "USD",
+      "txn_type": "LOAN_DISBURSEMENT",
+      "direction": "CREDIT",
+      "posting_date": "2026-08-21",
+      "transaction_id": "TX105001",
+      "counterparty_name": null,
+      "counterparty_country": null
+    },
+    {
+      "amount": 20500.0,
+      "txn_ts": "2026-09-30T12:00:00",
+      "channel": null,
+      "currency": "USD",
+      "txn_type": "LOAN_PAYOFF",
+      "direction": "CREDIT",
+      "posting_date": "2026-09-30",
+      "transaction_id": "TX105002",
+      "counterparty_name": null,
+      "counterparty_country": null
+    }
+  ],
+  "business_date": "2026-10-01"
+}

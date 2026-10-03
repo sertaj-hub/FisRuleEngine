@@ -1,0 +1,224 @@
+[
+  {
+    "rule": {
+      "code": "CARD_CASH_ADVANCE_VELOCITY",
+      "name": "Card cash advance velocity",
+      "version": 1
+    },
+    "account": {
+      "id": "CRD-200002",
+      "product_type": "CARD"
+    },
+    "summary": "Card cash advance velocity",
+    "alert_id": 16,
+    "customer": {
+      "id": "CUS-5900",
+      "name": "Daniel Okafor",
+      "type": "INDIVIDUAL",
+      "state": "TX",
+      "country": "US"
+    },
+    "delivery": {
+      "id": 2,
+      "revision": 2
+    },
+    "evidence": {
+      "total": 2000.0,
+      "min_sum": 1500,
+      "min_count": 3,
+      "txn_count": 4,
+      "window_days": 7
+    },
+    "transactions": [
+      {
+        "amount": 500.0,
+        "txn_ts": "2026-09-25T11:00:00",
+        "channel": null,
+        "currency": "USD",
+        "txn_type": "CARD_CASH_ADVANCE",
+        "direction": "DEBIT",
+        "posting_date": "2026-09-25",
+        "transaction_id": "TX900011",
+        "counterparty_name": null,
+        "counterparty_country": null
+      },
+      {
+        "amount": 500.0,
+        "txn_ts": "2026-09-27T12:30:00",
+        "channel": null,
+        "currency": "USD",
+        "txn_type": "CARD_CASH_ADVANCE",
+        "direction": "DEBIT",
+        "posting_date": "2026-09-27",
+        "transaction_id": "TX900012",
+        "counterparty_name": null,
+        "counterparty_country": null
+      },
+      {
+        "amount": 500.0,
+        "txn_ts": "2026-09-29T16:10:00",
+        "channel": null,
+        "currency": "USD",
+        "txn_type": "CARD_CASH_ADVANCE",
+        "direction": "DEBIT",
+        "posting_date": "2026-09-29",
+        "transaction_id": "TX900013",
+        "counterparty_name": null,
+        "counterparty_country": null
+      },
+      {
+        "amount": 500.0,
+        "txn_ts": "2026-09-30T13:45:00",
+        "channel": null,
+        "currency": "USD",
+        "txn_type": "CARD_CASH_ADVANCE",
+        "direction": "DEBIT",
+        "posting_date": "2026-09-30",
+        "transaction_id": "TX900014",
+        "counterparty_name": null,
+        "counterparty_country": null
+      }
+    ],
+    "business_date": "2026-10-01"
+  },
+  {
+    "rule": {
+      "code": "LARGE_CASH_DAILY",
+      "name": "Large cash activity in one day",
+      "version": 1
+    },
+    "account": {
+      "id": "DEP-200001",
+      "product_type": "DEPOSIT"
+    },
+    "summary": "Large cash activity in one day",
+    "alert_id": 20,
+    "customer": {
+      "id": "CUS-5900",
+      "name": "Daniel Okafor",
+      "type": "INDIVIDUAL",
+      "state": "TX",
+      "country": "US"
+    },
+    "delivery": {
+      "id": 2,
+      "revision": 2
+    },
+    "evidence": {
+      "total": 11000.0,
+      "min_sum": 10000.01,
+      "min_count": 1,
+      "txn_count": 2,
+      "window_days": 1
+    },
+    "transactions": [
+      {
+        "amount": 6000.0,
+        "txn_ts": "2026-09-30T09:40:00",
+        "channel": null,
+        "currency": "USD",
+        "txn_type": "CASH_DEPOSIT",
+        "direction": "CREDIT",
+        "posting_date": "2026-09-30",
+        "transaction_id": "TX900003",
+        "counterparty_name": null,
+        "counterparty_country": null
+      },
+      {
+        "amount": 5000.0,
+        "txn_ts": "2026-09-30T15:55:00",
+        "channel": null,
+        "currency": "USD",
+        "txn_type": "CASH_DEPOSIT",
+        "direction": "CREDIT",
+        "posting_date": "2026-09-30",
+        "transaction_id": "TX900004",
+        "counterparty_name": null,
+        "counterparty_country": null
+      }
+    ],
+    "business_date": "2026-10-01"
+  },
+  {
+    "rule": {
+      "code": "STRUCTURING_CASH_DEPOSITS",
+      "name": "Possible structuring of cash deposits",
+      "version": 1
+    },
+    "account": {
+      "id": "DEP-200001",
+      "product_type": "DEPOSIT"
+    },
+    "summary": "Possible structuring of cash deposits",
+    "alert_id": 24,
+    "customer": {
+      "id": "CUS-5900",
+      "name": "Daniel Okafor",
+      "type": "INDIVIDUAL",
+      "state": "TX",
+      "country": "US"
+    },
+    "delivery": {
+      "id": 2,
+      "revision": 2
+    },
+    "evidence": {
+      "total": 29500.0,
+      "min_sum": 10000,
+      "min_count": 3,
+      "txn_count": 4,
+      "window_days": 5
+    },
+    "transactions": [
+      {
+        "amount": 9500.0,
+        "txn_ts": "2026-09-28T10:05:00",
+        "channel": null,
+        "currency": "USD",
+        "txn_type": "CASH_DEPOSIT",
+        "direction": "CREDIT",
+        "posting_date": "2026-09-28",
+        "transaction_id": "TX900001",
+        "counterparty_name": null,
+        "counterparty_country": null
+      },
+      {
+        "amount": 9000.0,
+        "txn_ts": "2026-09-29T14:20:00",
+        "channel": null,
+        "currency": "USD",
+        "txn_type": "CASH_DEPOSIT",
+        "direction": "CREDIT",
+        "posting_date": "2026-09-29",
+        "transaction_id": "TX900002",
+        "counterparty_name": null,
+        "counterparty_country": null
+      },
+      {
+        "amount": 6000.0,
+        "txn_ts": "2026-09-30T09:40:00",
+        "channel": null,
+        "currency": "USD",
+        "txn_type": "CASH_DEPOSIT",
+        "direction": "CREDIT",
+        "posting_date": "2026-09-30",
+        "transaction_id": "TX900003",
+        "counterparty_name": null,
+        "counterparty_country": null
+      },
+      {
+        "amount": 5000.0,
+        "txn_ts": "2026-09-30T15:55:00",
+        "channel": null,
+        "currency": "USD",
+        "txn_type": "CASH_DEPOSIT",
+        "direction": "CREDIT",
+        "posting_date": "2026-09-30",
+        "transaction_id": "TX900004",
+        "counterparty_name": null,
+        "counterparty_country": null
+      }
+    ],
+    "business_date": "2026-10-01"
+  }
+]

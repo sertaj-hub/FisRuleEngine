@@ -1,0 +1,70 @@
+{
+  "rule": {
+    "code": "STRUCTURING_CASH_DEPOSITS",
+    "name": "Possible structuring of cash deposits",
+    "version": 1
+  },
+  "account": {
+    "id": "DEP-100180",
+    "product_type": "DEPOSIT"
+  },
+  "summary": "Possible structuring of cash deposits",
+  "alert_id": 10,
+  "customer": {
+    "id": "CUS-5080",
+    "name": "Elena Petrova",
+    "type": "INDIVIDUAL",
+    "state": "IL",
+    "country": "US"
+  },
+  "delivery": {
+    "id": 1,
+    "revision": 1
+  },
+  "evidence": {
+    "total": 26500.0,
+    "min_sum": 10000,
+    "min_count": 3,
+    "txn_count": 3,
+    "window_days": 5
+  },
+  "transactions": [
+    {
+      "amount": 9500.0,
+      "txn_ts": "2026-09-27T12:00:00",
+      "channel": null,
+      "currency": "USD",
+      "txn_type": "CASH_DEPOSIT",
+      "direction": "CREDIT",
+      "posting_date": "2026-09-27",
+      "transaction_id": "TX108001",
+      "counterparty_name": null,
+      "counterparty_country": null
+    },
+    {
+      "amount": 9000.0,
+      "txn_ts": "2026-09-29T12:00:00",
+      "channel": null,
+      "currency": "USD",
+      "txn_type": "CASH_DEPOSIT",
+      "direction": "CREDIT",
+      "posting_date": "2026-09-29",
+      "transaction_id": "TX108002",
+      "counterparty_name": null,
+      "counterparty_country": null
+    },
+    {
+      "amount": 8000.0,
+      "txn_ts": "2026-09-30T12:00:00",
+      "channel": null,
+      "currency": "USD",
+      "txn_type": "CASH_DEPOSIT",
+      "direction": "CREDIT",
+      "posting_date": "2026-09-30",
+      "transaction_id": "TX108003",
+      "counterparty_name": null,
+      "counterparty_country": null
+    }
+  ],
+  "business_date": "2026-10-01"
+}

@@ -1,0 +1,48 @@
+{
+  "rule": {
+    "code": "DEBIT_SPIKE_VS_BASELINE",
+    "name": "Debit activity far above the account's own norm",
+    "version": 1
+  },
+  "account": {
+    "id": "DEP-100120",
+    "product_type": "DEPOSIT"
+  },
+  "summary": "Debit activity far above the account's own norm",
+  "alert_id": 2,
+  "customer": {
+    "id": "CUS-5020",
+    "name": "Daniel Okafor",
+    "type": "INDIVIDUAL",
+    "state": "TX",
+    "country": "US"
+  },
+  "delivery": {
+    "id": 1,
+    "revision": 1
+  },
+  "evidence": {
+    "ratio": 36.0,
+    "today": 6000.0,
+    "metric": "SUM",
+    "multiplier": 5,
+    "baseline_days": 30,
+    "baseline_active_days": 10,
+    "baseline_daily_average": 166.67
+  },
+  "transactions": [
+    {
+      "amount": 6000.0,
+      "txn_ts": "2026-09-30T12:00:00",
+      "channel": null,
+      "currency": "USD",
+      "txn_type": "WIRE_OUT",
+      "direction": "DEBIT",
+      "posting_date": "2026-09-30",
+      "transaction_id": "TX102011",
+      "counterparty_name": null,
+      "counterparty_country": null
+    }
+  ],
+  "business_date": "2026-10-01"
+}

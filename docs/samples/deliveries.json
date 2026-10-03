@@ -1,0 +1,38 @@
+[
+  {
+    "delivery_id": 1,
+    "business_date": "2026-10-01",
+    "revision": 1,
+    "status": "READY",
+    "alert_count": 11,
+    "rule_counts": {
+      "LARGE_CASH_DAILY": 1,
+      "LOAN_EARLY_PAYOFF": 1,
+      "DORMANT_REACTIVATION": 3,
+      "CREDIT_BALANCE_REFUND": 1,
+      "DEBIT_SPIKE_VS_BASELINE": 1,
+      "RAPID_MOVEMENT_OF_FUNDS": 1,
+      "NEW_COUNTERPARTY_COUNTRY": 1,
+      "STRUCTURING_CASH_DEPOSITS": 1,
+      "CARD_CASH_ADVANCE_VELOCITY": 1
+    },
+    "checksum": "29307d08264fa47eb85a72a115ee234c288e2d3a49a9fc393c010262c33bf98f",
+    "ready_ts": "2026-10-03T06:46:47.888538",
+    "confirmed_ts": null
+  },
+  {
+    "delivery_id": 2,
+    "business_date": "2026-10-01",
+    "revision": 2,
+    "status": "READY",
+    "alert_count": 3,
+    "rule_counts": {
+      "LARGE_CASH_DAILY": 1,
+      "STRUCTURING_CASH_DEPOSITS": 1,
+      "CARD_CASH_ADVANCE_VELOCITY": 1
+    },
+    "checksum": "b635c9582b4ea4f3c10345bb124db5ef7186def6cda8308f9aac917bb175bae6",
+    "ready_ts": "2026-10-03T06:47:09.753836",
+    "confirmed_ts": null
+  }
+]

@@ -1,0 +1,58 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://fis.example/aml/alert-payload.schema.json",
+  "title": "AML alert payload (aml.v_alert_export.payload)",
+  "type": "object",
+  "required": ["alert_id", "business_date", "summary", "delivery", "rule", "account", "customer", "evidence", "transactions"],
+  "properties": {
+    "alert_id": {"type": "integer", "minimum": 1},
+    "business_date": {"type": "string", "format": "date"},
+    "summary": {"type": "string"},
+    "delivery": {
+      "type": "object", "required": ["id", "revision"],
+      "properties": {"id": {"type": "integer"}, "revision": {"type": "integer", "minimum": 1}}
+    },
+    "rule": {
+      "type": "object", "required": ["code", "name", "version"],
+      "properties": {
+        "code": {"type": "string"},
+        "name": {"type": "string"},
+        "version": {"type": "integer", "minimum": 1}
+      }
+    },
+    "account": {
+      "type": "object", "required": ["id", "product_type"],
+      "properties": {"id": {"type": "string"}, "product_type": {"enum": ["CARD", "LOAN", "DEPOSIT"]}}
+    },
+    "customer": {
+      "type": "object", "required": ["id"],
+      "properties": {
+        "id": {"type": "string"},
+        "name": {"type": ["string", "null"]},
+        "type": {"type": ["string", "null"]},
+        "country": {"type": ["string", "null"]},
+        "state": {"type": ["string", "null"]}
+      }
+    },
+    "evidence": {"type": "object"},
+    "transactions": {
+      "type": "array", "maxItems": 200,
+      "items": {
+        "type": "object",
+        "required": ["transaction_id", "posting_date", "txn_type", "direction", "amount"],
+        "properties": {
+          "transaction_id": {"type": "string"},
+          "posting_date": {"type": "string", "format": "date"},
+          "txn_ts": {"type": ["string", "null"]},
+          "txn_type": {"type": "string"},
+          "direction": {"enum": ["CREDIT", "DEBIT"]},
+          "amount": {"type": "number", "exclusiveMinimum": 0},
+          "currency": {"type": ["string", "null"]},
+          "channel": {"type": ["string", "null"]},
+          "counterparty_name": {"type": ["string", "null"]},
+          "counterparty_country": {"type": ["string", "null"]}
+        }
+      }
+    }
+  }
+}

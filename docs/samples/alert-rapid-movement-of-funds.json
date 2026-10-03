@@ -1,0 +1,59 @@
+{
+  "rule": {
+    "code": "RAPID_MOVEMENT_OF_FUNDS",
+    "name": "Rapid movement of funds",
+    "version": 1
+  },
+  "account": {
+    "id": "DEP-100170",
+    "product_type": "DEPOSIT"
+  },
+  "summary": "Rapid movement of funds",
+  "alert_id": 8,
+  "customer": {
+    "id": "CUS-5070",
+    "name": "Omar Haddad",
+    "type": "INDIVIDUAL",
+    "state": "TX",
+    "country": "US"
+  },
+  "delivery": {
+    "id": 1,
+    "revision": 1
+  },
+  "evidence": {
+    "min_in": 10000,
+    "out_pct": 96.0,
+    "total_in": 50000.0,
+    "total_out": 48000.0,
+    "min_out_pct": 80,
+    "window_days": 3
+  },
+  "transactions": [
+    {
+      "amount": 50000.0,
+      "txn_ts": "2026-09-29T12:00:00",
+      "channel": null,
+      "currency": "USD",
+      "txn_type": "WIRE_IN",
+      "direction": "CREDIT",
+      "posting_date": "2026-09-29",
+      "transaction_id": "TX107001",
+      "counterparty_name": null,
+      "counterparty_country": null
+    },
+    {
+      "amount": 48000.0,
+      "txn_ts": "2026-09-30T12:00:00",
+      "channel": null,
+      "currency": "USD",
+      "txn_type": "WIRE_OUT",
+      "direction": "DEBIT",
+      "posting_date": "2026-09-30",
+      "transaction_id": "TX107002",
+      "counterparty_name": null,
+      "counterparty_country": null
+    }
+  ],
+  "business_date": "2026-10-01"
+}
