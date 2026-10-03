@@ -37,6 +37,21 @@ Schema names: `FISRE_SCHEMA_STG|MST|AML`. Exit code is non-zero when a batch fai
 
 [`fisre-ml/`](fisre-ml/README.md) trains and scores an unsupervised anomaly model in Python; its scores become `ML_ANOMALY` alerts through the `ML_SCORE` rule template. It ships in shadow mode (rule `DRAFT`): scores are recorded for review, nothing reaches case management until the rule is made `ACTIVE`.
 
+## Rule configuration UI
+
+Compliance staff change rules in a browser instead of editing YAML (ADR-0010, [`specs/requirements/rule-ui.md`](specs/requirements/rule-ui.md)).
+Every change is a new version that goes **draft, dry-run, submit, approve by a different person**; each step is in an append-only audit trail.
+
+```bash
+# create users (min. 12 character password; roles VIEWER, AUTHOR, APPROVER, comma separated)
+FISRE_JOB=create-user FISRE_USER=alice FISRE_PASSWORD='...' FISRE_ROLES=AUTHOR java -jar $JAR
+FISRE_JOB=create-user FISRE_USER=bob   FISRE_PASSWORD='...' FISRE_ROLES=APPROVER java -jar $JAR
+FISRE_JOB=serve java -jar $JAR                  # http://127.0.0.1:8080 (FISRE_WEB_BIND, FISRE_WEB_PORT). Put TLS in front before exposing it.
+FISRE_JOB=export-rules FISRE_EXPORT_DIR=specs/rules java -jar $JAR   # database rules back to YAML (keeps each file's tests:), then commit to git
+```
+
+The database is the source of truth for rule versions. `load-rules` will not overwrite a rule whose latest version was made in the UI. Scenarios stay in `specs/rules/*.yml` and keep running in the build.
+
 ## Rules
 
 A rule is a YAML file in [`specs/rules/`](specs/rules) that configures a generic template (no code, no severity). Each file carries its own test

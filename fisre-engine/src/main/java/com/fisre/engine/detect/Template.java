@@ -14,7 +14,22 @@ public interface Template {
     /** What a template produces for one business date. */
     record Built(String hitsSql, String evidenceSql, Map<String, Object> params) {}
 
+    /**
+     * One configuration key for form generation (ADR-0010). {@code kind} is INT, DECIMAL, TEXT, ENUM, FILTER or PRODUCTS;
+     * {@code options} lists the allowed values of an ENUM.
+     */
+    record Field(String key, String label, String kind, boolean required, String help, java.util.List<String> options) {
+        public static Field of(String key, String label, String kind, boolean required, String help) {
+            return new Field(key, label, kind, required, help, java.util.List.of());
+        }
+    }
+
     String code();
+
+    /** The keys this template accepts, described for the rule editor. Must match what {@link #validate} accepts. */
+    default java.util.List<Field> fields() {
+        return java.util.List.of();
+    }
 
     /** Throws IllegalArgumentException with a clear message if the config is not valid for this template. */
     void validate(JsonNode config);

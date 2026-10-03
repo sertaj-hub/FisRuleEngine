@@ -123,7 +123,7 @@ public class RuleLoader {
 
     /** Returns true if a new version was written. */
     private boolean store(RuleSpec s) {
-        List<Map<String, Object>> latest = jdbc.queryForList("SELECT version, name, description, template_code, status, suppress_days, CAST(config AS text) AS config"
+        List<Map<String, Object>> latest = jdbc.queryForList("SELECT version, name, description, template_code, status, suppress_days, CAST(config AS text) AS config, source"
                 + " FROM " + rule + " WHERE rule_code = :c AND version = (SELECT MAX(version) FROM " + rule + " WHERE rule_code = :c)",
                 Map.of("c", s.code()));
         int version = 1;
@@ -131,6 +131,12 @@ public class RuleLoader {
             Map<String, Object> l = latest.get(0);
             version = ((Number) l.get("version")).intValue();
             if (same(s, l)) {
+                return false;
+            }
+            if ("UI".equals(l.get("source"))) {
+                // the database is ahead of the file: someone changed this rule through the UI (ADR-0010, REQ-RUI-010)
+                log.warn("Rule {}: the latest version {} was created in the UI and differs from {}; the file is NOT loaded. Run export-rules to bring the file up to date.",
+                        s.code(), version, s.sourceFile());
                 return false;
             }
             version++;

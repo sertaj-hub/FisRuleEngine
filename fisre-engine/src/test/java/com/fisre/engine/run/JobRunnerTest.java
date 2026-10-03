@@ -26,7 +26,8 @@ class JobRunnerTest {
     private static JobRunner runner(FisreProperties props, com.fisre.engine.detect.DetectionService detection, NightlyService nightly, HealthService health) {
         return new JobRunner(props, mock(BatchService.class), mock(com.fisre.engine.rules.RuleLoader.class), detection,
                 mock(com.fisre.engine.promotion.RetentionService.class), mock(com.fisre.engine.promotion.SyntheticData.class), nightly,
-                mock(JobLock.class), health, mock(com.fisre.engine.detect.DeliveryService.class));
+                mock(JobLock.class), health, mock(com.fisre.engine.detect.DeliveryService.class),
+                mock(com.fisre.engine.rules.RuleExporter.class), mock(com.fisre.engine.web.RuleUserService.class), new org.springframework.mock.env.MockEnvironment());
     }
 
     @Test

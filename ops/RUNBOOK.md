@@ -35,6 +35,15 @@ Re-running `nightly` for the same batch after a later step failed is safe: promo
 - Retention: part of `nightly`; or `FISRE_JOB=retain FISRE_BUSINESS_DATE=D` (keeps 13 months, `FISRE_RETENTION_MONTHS`).
 - Synthetic data for demos and tests: `FISRE_JOB=generate` (see README).
 
+## Rule UI (rule changes)
+
+* Start: `FISRE_JOB=serve` (listens on 127.0.0.1:8080; set `FISRE_WEB_BIND`/`FISRE_WEB_PORT`). It uses HTTP Basic, so **never expose it without TLS** (reverse proxy). It is a long-running process, unlike the batch jobs, and does not take the batch job lock.
+* Users: `FISRE_JOB=create-user FISRE_USER=... FISRE_PASSWORD=... FISRE_ROLES=AUTHOR|APPROVER|VIEWER`. Running it again for the same user resets the password and roles. There is no lockout yet: use a strong password and keep the port private.
+* An approval takes effect for the **next** detect run; a run already in progress keeps the rules it started with.
+* After approved changes, run `export-rules` into `specs/rules` and commit, so git matches the database. `load-rules` skips rules whose latest version was made in the UI and logs a warning.
+* Who changed what: `aml.rule` (columns `authored_by`, `submitted_by`, `decided_by`, `decision_note`) and `aml.rule_audit` (append-only).
+* A dry-run is heavy at production volume (it reads up to 31 posting days). It times out after 5 minutes; run it outside the batch window.
+
 ## Monitoring and health
 
 - `FISRE_JOB=health [FISRE_BUSINESS_DATE=D]` (read-only, no lock) prints findings and exits non-zero only for CRITICAL ones: a batch stuck in `PROMOTING`, a rule that failed and has not succeeded since, and (with a date) an incomplete nightly run. WARN findings are an unacknowledged-alert backlog, missing posting days inside the loaded range, and leftover `txn_new_*` build tables. Run it after the nightly job from the scheduler and alert on a non-zero exit.

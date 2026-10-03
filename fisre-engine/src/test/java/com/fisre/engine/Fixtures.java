@@ -39,6 +39,8 @@ public class Fixtures {
     public void resetAll() {
         jdbc.execute("DROP TRIGGER IF EXISTS fail_acct ON " + mst + ".account");
         purgeAlerts();
+        purgeRuleAudit();
+        jdbc.update("DELETE FROM " + aml + ".rule_user");
         for (String t : new String[] {aml + ".ml_score", aml + ".ml_model", aml + ".alert_rejection_notice", aml + ".alert_delivery", aml + ".rule_run", aml + ".rule", aml + ".nightly_run"}) {
             jdbc.update("DELETE FROM " + t);
         }
@@ -58,6 +60,18 @@ public class Fixtures {
         for (String t : new String[] {aml + ".load_reject", aml + ".load_batch_entity", aml + ".load_batch"}) {
             jdbc.update("DELETE FROM " + t);
         }
+    }
+
+    /** The rule audit trail is append-only; tests clear it with the documented bypass, on one connection. */
+    public void purgeRuleAudit() {
+        jdbc.execute((org.springframework.jdbc.core.ConnectionCallback<Void>) con -> {
+            try (java.sql.Statement st = con.createStatement()) {
+                st.execute("SET aml.allow_audit_purge = 'on'");
+                st.execute("DELETE FROM " + aml + ".rule_audit");
+                st.execute("RESET aml.allow_audit_purge");
+            }
+            return null;
+        });
     }
 
     /** Registers an ML model row (no artifact; detection only reads scores). */

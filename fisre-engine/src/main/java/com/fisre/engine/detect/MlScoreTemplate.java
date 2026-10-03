@@ -20,6 +20,14 @@ public class MlScoreTemplate extends TemplateSupport {
 
     @Override public String code() { return "ML_SCORE"; }
 
+    @Override
+    public java.util.List<Field> fields() {
+        return java.util.List.of(
+                Field.of("model", "Model name", "TEXT", false, "Default account_anomaly"),
+                Field.of("min_score", "Minimum anomaly score", "DECIMAL", true, "0 to 1; 0.995 means more unusual than 99.5 percent of training"),
+                Field.of("product_types", "Products", "PRODUCTS", false, "Limit the rule to these products; empty means all"));
+    }
+
     @Override protected Set<String> allowedKeys() { return Set.of("model", "min_score"); }
 
     @Override

@@ -20,6 +20,16 @@ public class NewAttributeTemplate extends TemplateSupport {
     @Override public String code() { return "NEW_ATTRIBUTE"; }
 
     @Override
+    public java.util.List<Field> fields() {
+        return java.util.List.of(
+                new Field("attribute", "Attribute", "ENUM", true, "Alert when a value not seen in the baseline appears", new java.util.ArrayList<>(new java.util.TreeSet<>(ATTRIBUTES))),
+                Field.of("baseline_days", "Baseline (days)", "INT", true, "Values seen in this period are not new"),
+                Field.of("filter", "Matching transactions", "FILTER", false, "Which transactions are considered"),
+                Field.of("min_active_days", "Minimum active days in baseline", "INT", false, "Default 1"),
+                Field.of("product_types", "Products", "PRODUCTS", false, "Limit the rule to these products; empty means all"));
+    }
+
+    @Override
     protected Set<String> allowedKeys() {
         return Set.of("attribute", "baseline_days", "filter", "min_active_days");
     }

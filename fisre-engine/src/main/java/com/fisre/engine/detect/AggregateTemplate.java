@@ -14,6 +14,16 @@ public class AggregateTemplate extends TemplateSupport {
 
     @Override public String code() { return "AGGREGATE"; }
 
+    @Override
+    public java.util.List<Field> fields() {
+        return java.util.List.of(
+                Field.of("window_days", "Window (days)", "INT", true, "Look back this many days, ending on the posting day"),
+                Field.of("filter", "Matching transactions", "FILTER", false, "Which transactions count"),
+                Field.of("min_count", "Minimum number of transactions", "INT", false, "Default 1"),
+                Field.of("min_sum", "Minimum total amount", "DECIMAL", false, "Total of the matching transactions"),
+                Field.of("product_types", "Products", "PRODUCTS", false, "Limit the rule to these products; empty means all"));
+    }
+
     @Override protected Set<String> allowedKeys() { return Set.of("window_days", "filter", "min_count", "min_sum"); }
 
     @Override
