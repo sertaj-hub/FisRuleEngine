@@ -197,10 +197,10 @@ class DetectionIT {
 
         DetectionService.Result r = detection.detect(D);
 
-        assertThat(r.rulesRun()).isEqualTo(7);
+        assertThat(r.rulesRun()).isEqualTo(9);   // every spec in specs/rules
         assertThat(r.rulesFailed()).isZero();
         assertThat(jdbc.queryForList("SELECT rule_code || ':' || account_id FROM " + aml + ".alert ORDER BY 1", String.class))
                 .containsExactly("DORMANT_REACTIVATION:A1", "LARGE_CASH_DAILY:A1", "LOAN_EARLY_PAYOFF:L1");
-        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM " + aml + ".rule_run WHERE status = 'SUCCESS'", Long.class)).isEqualTo(7);
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM " + aml + ".rule_run WHERE status = 'SUCCESS'", Long.class)).isEqualTo(9);
     }
 }

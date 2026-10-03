@@ -53,7 +53,7 @@ public class SequenceTemplate extends TemplateSupport {
                 + "GROUP BY a.account_id, a.primary_customer_id, a.product_type, th.amt "
                 + "HAVING SUM(f.amount) >= :first_min AND th.amt >= :then_min AND th.amt * 100 >= SUM(f.amount) * :then_pct";
         String firstT = filter(c, "first", true).sql("t", "first_", params, mst);
-        String evidence = "SELECT t.account_id, t.transaction_id FROM " + mst + ".txn t "
+        String evidence = "SELECT t.account_id, t.transaction_id, t.posting_date FROM " + mst + ".txn t "
                 + "WHERE t.account_id IN (SELECT h.account_id FROM {hits}) AND t.posting_date BETWEEN :start AND :end "
                 + "AND ((" + then + " AND t.posting_date = :end) OR (" + firstT + "))";
         return new Built(hits, evidence, params);

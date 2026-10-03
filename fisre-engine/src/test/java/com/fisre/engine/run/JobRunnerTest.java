@@ -16,8 +16,12 @@ class JobRunnerTest {
     }
 
     private static JobRunner runner(FisreProperties props, com.fisre.engine.detect.DetectionService detection) {
+        return runner(props, detection, mock(NightlyService.class));
+    }
+
+    private static JobRunner runner(FisreProperties props, com.fisre.engine.detect.DetectionService detection, NightlyService nightly) {
         return new JobRunner(props, mock(BatchService.class), mock(com.fisre.engine.rules.RuleLoader.class), detection,
-                mock(com.fisre.engine.promotion.RetentionService.class), mock(com.fisre.engine.promotion.SyntheticData.class));
+                mock(com.fisre.engine.promotion.RetentionService.class), mock(com.fisre.engine.promotion.SyntheticData.class), nightly);
     }
 
     @Test
@@ -43,5 +47,18 @@ class JobRunnerTest {
                 .thenReturn(new com.fisre.engine.detect.DetectionService.Result(3, 1, 0));
         assertThatThrownBy(() -> runner(Fixtures.props("detect", "", "2026-09-30"), detection).run(null))
                 .hasMessageContaining("1 of 3 rule(s) failed");
+    }
+
+    @Test
+    @Req({"REQ-RUN-002", "REQ-RUN-003"})
+    void nightlyNeedsBatchAndDate_andExitsNonZeroAtTheFailingStep() {
+        var detection = mock(com.fisre.engine.detect.DetectionService.class);
+        assertThatThrownBy(() -> runner(Fixtures.props("nightly", "B1", ""), detection).run(null)).hasMessageContaining("needs fisre.batch-id");
+        var nightly = mock(NightlyService.class);
+        org.mockito.Mockito.when(nightly.run("B1", java.time.LocalDate.parse("2026-10-01"))).thenReturn(java.util.List.of(
+                new NightlyService.Step("PROMOTE", "SUCCESS", null), new NightlyService.Step("DETECT", "FAILED", "2 of 7 rule(s) failed"),
+                new NightlyService.Step("RETAIN", "SKIPPED", "an earlier step failed")));
+        assertThatThrownBy(() -> runner(Fixtures.props("nightly", "B1", "2026-10-01"), detection, nightly).run(null))
+                .hasMessageContaining("failed at DETECT").hasMessageContaining("2 of 7");
     }
 }

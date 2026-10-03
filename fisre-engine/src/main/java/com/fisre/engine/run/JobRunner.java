@@ -13,7 +13,7 @@ import org.springframework.boot.ApplicationRunner;
 import org.springframework.stereotype.Component;
 
 /**
- * Runs the job named by fisre.job (FISRE_JOB), then the process exits. Batch jobs (promote, clean, reopen) need
+ * Runs the job named by fisre.job (FISRE_JOB), then the process exits. Batch jobs (promote, clean, reopen, nightly) need
  * fisre.batch-id; detect needs fisre.business-date; load-rules reads fisre.rules-dir.
  * Any failure, including a batch that fails validation, makes the process exit non-zero.
  */
@@ -28,15 +28,17 @@ public class JobRunner implements ApplicationRunner {
     private final DetectionService detection;
     private final RetentionService retention;
     private final SyntheticData synthetic;
+    private final NightlyService nightly;
 
     public JobRunner(FisreProperties props, BatchService batches, RuleLoader rules, DetectionService detection,
-                     RetentionService retention, SyntheticData synthetic) {
+                     RetentionService retention, SyntheticData synthetic, NightlyService nightly) {
         this.props = props;
         this.batches = batches;
         this.rules = rules;
         this.detection = detection;
         this.retention = retention;
         this.synthetic = synthetic;
+        this.nightly = nightly;
     }
 
     @Override
@@ -55,6 +57,17 @@ public class JobRunner implements ApplicationRunner {
             long failed = results.stream().filter(r -> r.outcome() == BatchService.Outcome.FAILED).count();
             if (failed > 0) {
                 throw new IllegalStateException(failed + " of " + results.size() + " batch(es) failed; see aml.load_batch and aml.load_reject");
+            }
+            return;
+        }
+        if (job.equals("nightly")) {
+            if (props.batchId() == null || props.batchId().isBlank() || props.businessDate() == null || props.businessDate().isBlank()) {
+                throw new IllegalArgumentException("fisre.job=nightly needs fisre.batch-id (FISRE_BATCH_ID) and fisre.business-date (FISRE_BUSINESS_DATE)");
+            }
+            var steps = nightly.run(props.batchId(), java.time.LocalDate.parse(props.businessDate()));
+            var failed = steps.stream().filter(NightlyService.Step::failed).findFirst();
+            if (failed.isPresent()) {
+                throw new IllegalStateException("Nightly run failed at " + failed.get().step() + ": " + failed.get().message());
             }
             return;
         }
@@ -82,7 +95,7 @@ public class JobRunner implements ApplicationRunner {
         }
         String batchId = props.batchId();
         if (!java.util.Set.of("promote", "clean", "reopen").contains(job)) {
-            throw new IllegalArgumentException("Unknown fisre.job '" + job + "' (expected none, promote, promote-loaded, clean, reopen, load-rules, detect, retain or generate)");
+            throw new IllegalArgumentException("Unknown fisre.job '" + job + "' (expected none, promote, promote-loaded, clean, reopen, load-rules, detect, retain, generate or nightly)");
         }
         if (batchId == null || batchId.isBlank()) {
             throw new IllegalArgumentException("fisre.job=" + job + " needs fisre.batch-id (FISRE_BATCH_ID)");

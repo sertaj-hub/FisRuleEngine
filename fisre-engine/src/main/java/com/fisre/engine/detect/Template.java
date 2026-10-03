@@ -20,7 +20,7 @@ public interface Template {
 
     /**
      * {@code hitsSql} returns account_id, customer_id, product_type, evidence (jsonb) - one row per account that hits.
-     * {@code evidenceSql} returns account_id, transaction_id for the transactions behind the hits and selects
+     * {@code evidenceSql} returns account_id, transaction_id, posting_date for the transactions behind the hits and selects
      * from the placeholder {@code {hits}}, which the caller replaces with the hits query as a subquery named h.
      */
     Built build(JsonNode config, LocalDate businessDate, String mst);

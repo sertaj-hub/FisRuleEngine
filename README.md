@@ -9,7 +9,7 @@ bank ETL ─► stg (customer, account, txn, tagged batch_id) ─[promote batch]
 A **batch** is one business date and succeeds or fails as a whole. The 1 am batch for business date D carries the transactions posted on **D-1** (`FISRE_POSTING_OFFSET_DAYS`, default 1). On success its staging partitions are dropped; on failure
 fix stg and `reopen`, or `clean` and reload under a new batch id. The ETL registers a batch by inserting into `aml.load_batch`, which creates its staging partitions `<table>_b<batch_seq>`; load straight into those for speed. Protocol: [`specs/data-contract/batch-protocol.md`](specs/data-contract/batch-protocol.md).
 
-Status: Phases 0 to 4 done (foundation, batch promotion, rule framework, seven starter rules, partitioned scale design). Designed for 10M transactions a day and 13 months of history ([ADR-0005](specs/adr/0005-scale-design.md)).
+Status: Phases 0 to 5 done (foundation, batch promotion, rule framework, nine rules, partitioned scale design, nightly run, database handoff to case management). Designed for 10M transactions a day and 13 months of history ([ADR-0005](specs/adr/0005-scale-design.md)).
 Specs: [`specs/`](specs/README.md). Decisions: [`specs/adr/`](specs/adr).
 
 ## Run
@@ -19,9 +19,10 @@ docker compose up -d postgres            # or any PostgreSQL with schemas stg, m
 export FISRE_DB_URL=jdbc:postgresql://localhost:5432/fisre FISRE_DB_USER=fisre FISRE_DB_PASSWORD=fisre
 mvn -q -pl fisre-engine package -DskipTests
 # every run migrates the schema first, then runs one job (none = migrate only):
-#   promote | promote-loaded | clean | reopen | load-rules | detect | retain | generate
+#   nightly | promote | promote-loaded | clean | reopen | load-rules | detect | retain | generate
 JAR=fisre-engine/target/fisre-engine-0.1.0-SNAPSHOT.jar
-FISRE_JOB=promote FISRE_BATCH_ID=2026-09-30-01 java -jar $JAR      # stg -> mst for one batch
+FISRE_JOB=nightly FISRE_BATCH_ID=2026-10-01-01 FISRE_BUSINESS_DATE=2026-10-01 java -jar $JAR   # the one nightly command: promote, detect, retain
+FISRE_JOB=promote FISRE_BATCH_ID=2026-10-01-01 java -jar $JAR      # stg -> mst for one batch
 FISRE_JOB=load-rules FISRE_RULES_DIR=specs/rules java -jar $JAR    # rule specs -> aml.rule (versioned)
 FISRE_JOB=detect FISRE_BUSINESS_DATE=2026-10-01 java -jar $JAR     # active rules -> aml.alert
 FISRE_JOB=promote-loaded java -jar $JAR                            # history: every LOADED batch, earliest first then in parallel
@@ -42,6 +43,12 @@ scenarios, which the build runs against the database. Reference: [`specs/data-co
 | RAPID_MOVEMENT_OF_FUNDS | FLOW_THROUGH |
 | CREDIT_BALANCE_REFUND, LOAN_EARLY_PAYOFF | SEQUENCE |
 | DORMANT_REACTIVATION | DORMANT_REACTIVATION |
+| DEBIT_SPIKE_VS_BASELINE | BASELINE_DEVIATION |
+| NEW_COUNTERPARTY_COUNTRY | NEW_ATTRIBUTE |
+
+## Case management
+
+Case management reads alerts from the database: view `aml.v_alert_export` (one self-contained JSON payload per unsent alert) and function `aml.ack_alerts(ids)` to confirm pickup. Contract: [`specs/data-contract/alert-export.md`](specs/data-contract/alert-export.md), ADR-0006. Day-to-day operation and failure handling: [`ops/RUNBOOK.md`](ops/RUNBOOK.md).
 
 ## Test
 

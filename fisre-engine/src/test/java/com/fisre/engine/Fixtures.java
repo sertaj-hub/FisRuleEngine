@@ -38,7 +38,7 @@ public class Fixtures {
 
     public void resetAll() {
         jdbc.execute("DROP TRIGGER IF EXISTS fail_acct ON " + mst + ".account");
-        for (String t : new String[] {aml + ".alert", aml + ".rule_run", aml + ".rule"}) {
+        for (String t : new String[] {aml + ".alert", aml + ".rule_run", aml + ".rule", aml + ".nightly_run"}) {
             jdbc.update("DELETE FROM " + t);
         }
         for (String p : partitions(mst, "txn")) {
@@ -82,11 +82,15 @@ public class Fixtures {
                 + " VALUES (?, ?, ?, 'ACTIVE', ?, 'USD', 'FIX')", id, customerId, product, Date.valueOf(openDate));
     }
 
-    public void txn(String id, String accountId, String type, String direction, BigDecimal amount, String date, String time) {
+    public void txn(String id, String accountId, String type, String direction, BigDecimal amount, String date, String time, String counterpartyCountry) {
         ensurePartition(date);
-        jdbc.update("INSERT INTO " + mst + ".txn (transaction_id, account_id, txn_ts, posting_date, txn_type, direction, amount, currency, batch_id)"
-                + " VALUES (?, ?, ?, ?, ?, ?, ?, 'USD', 'FIX')", id, accountId, Timestamp.valueOf(date + " " + time + ":00"),
-                Date.valueOf(date), type, direction, amount);
+        jdbc.update("INSERT INTO " + mst + ".txn (transaction_id, account_id, txn_ts, posting_date, txn_type, direction, amount, currency, counterparty_country, batch_id)"
+                + " VALUES (?, ?, ?, ?, ?, ?, ?, 'USD', ?, 'FIX')", id, accountId, Timestamp.valueOf(date + " " + time + ":00"),
+                Date.valueOf(date), type, direction, amount, counterpartyCountry);
+    }
+
+    public void txn(String id, String accountId, String type, String direction, BigDecimal amount, String date, String time) {
+        txn(id, accountId, type, direction, amount, date, time, null);
     }
 
     public void txn(String id, String accountId, String type, String direction, String amount, String date) {

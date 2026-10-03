@@ -38,7 +38,7 @@ class RuleSpecIT {
     @Autowired DetectionService detection;
 
     @TestFactory
-    @Req({"REQ-RULE-005", "REQ-RULE-006", "REQ-RULE-007", "REQ-RULE-008", "REQ-RULE-009", "REQ-RULE-011"})
+    @Req({"REQ-RULE-005", "REQ-RULE-006", "REQ-RULE-007", "REQ-RULE-008", "REQ-RULE-009", "REQ-RULE-011", "REQ-RULE-012", "REQ-RULE-013"})
     Stream<DynamicTest> everyRuleSpecScenarioPasses() throws IOException {
         List<DynamicTest> tests = new ArrayList<>();
         Set<String> templatesUsed = new TreeSet<>();
@@ -80,7 +80,8 @@ class RuleSpecIT {
         }
         for (JsonNode t : sc.path("txns")) {
             fx.txn(t.get("id").asText(), t.get("account").asText(), t.get("type").asText(), t.get("direction").asText(),
-                    t.get("amount").decimalValue().setScale(2), t.get("date").asText(), t.path("time").asText("12:00"));
+                    t.get("amount").decimalValue().setScale(2), t.get("date").asText(), t.path("time").asText("12:00"),
+                    t.path("counterparty_country").asText(null));
         }
         loader.load(List.of(spec), spec.sourceFile());
 

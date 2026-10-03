@@ -138,12 +138,13 @@ public class DetectionService {
                 + " AND p.business_date >= :suppress_from AND p.business_date < :d)"
                 : " WHERE 1 = 1";
         int created = jdbc.update("INSERT INTO " + aml + ".alert (rule_id, rule_code, rule_version, business_date, account_id, customer_id,"
-                + " product_type, summary, evidence, run_id) SELECT :rule_id, :rule_code, :rule_version, :d, h.account_id, h.customer_id,"
-                + " h.product_type, :summary, h.evidence, :run_id FROM " + hits + suppression
+                + " product_type, summary, evidence, run_id, customer_snapshot) SELECT :rule_id, :rule_code, :rule_version, :d, h.account_id, h.customer_id,"
+                + " h.product_type, :summary, h.evidence, :run_id, jsonb_build_object('name', c.full_name, 'type', c.customer_type,"
+                + " 'country', c.country_code, 'state', c.state_code) FROM " + hits + " LEFT JOIN " + mst + ".customer c ON c.customer_id = h.customer_id" + suppression
                 + " ON CONFLICT (rule_code, account_id, business_date) DO NOTHING", params);
 
-        jdbc.update("INSERT INTO " + aml + ".alert_txn (alert_id, transaction_id) SELECT al.alert_id, e.transaction_id FROM ("
-                + "SELECT x.account_id, x.transaction_id FROM (SELECT v.account_id, v.transaction_id, ROW_NUMBER() OVER"
+        jdbc.update("INSERT INTO " + aml + ".alert_txn (alert_id, transaction_id, posting_date) SELECT al.alert_id, e.transaction_id, e.posting_date FROM ("
+                + "SELECT x.account_id, x.transaction_id, x.posting_date FROM (SELECT v.account_id, v.transaction_id, v.posting_date, ROW_NUMBER() OVER"
                 + " (PARTITION BY v.account_id ORDER BY v.transaction_id) AS rn FROM (" + b.evidenceSql().replace("{hits}", hits)
                 + ") v) x WHERE x.rn <= :max_evidence) e JOIN " + aml + ".alert al ON al.rule_code = :rule_code"
                 + " AND al.business_date = :d AND al.account_id = e.account_id ON CONFLICT DO NOTHING", params);

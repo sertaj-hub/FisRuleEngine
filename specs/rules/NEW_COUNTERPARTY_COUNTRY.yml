@@ -1,0 +1,56 @@
+code: NEW_COUNTERPARTY_COUNTRY
+name: First wire to a new counterparty country
+description: >
+  A wire of $1,000 or more to a counterparty country the account has not used in the previous 30 days,
+  for an account with at least five active days in that period.
+template: NEW_ATTRIBUTE
+status: ACTIVE
+suppress_days: 0
+config:
+  attribute: counterparty_country
+  baseline_days: 30
+  filter: { txn_types: [WIRE_OUT], min_amount: 1000 }
+  min_active_days: 5
+tests:
+  - name: established account wires to a new country; others must not alert
+    as_of: 2026-09-30
+    accounts: [{id: A1, product: DEPOSIT}, {id: A2, product: DEPOSIT}, {id: A3, product: DEPOSIT}, {id: A4, product: DEPOSIT}, {id: A5, product: DEPOSIT}]
+    txns:
+      - {id: T1, account: A1, type: WIRE_OUT, direction: DEBIT, amount: 2000, date: 2026-09-28, counterparty_country: GB}
+      - {id: T2, account: A1, type: WIRE_OUT, direction: DEBIT, amount: 2000, date: 2026-09-25, counterparty_country: GB}
+      - {id: T3, account: A1, type: WIRE_OUT, direction: DEBIT, amount: 2000, date: 2026-09-22, counterparty_country: GB}
+      - {id: T4, account: A1, type: WIRE_OUT, direction: DEBIT, amount: 2000, date: 2026-09-19, counterparty_country: GB}
+      - {id: T5, account: A1, type: WIRE_OUT, direction: DEBIT, amount: 2000, date: 2026-09-16, counterparty_country: GB}
+      - {id: T6, account: A1, type: WIRE_OUT, direction: DEBIT, amount: 2000, date: 2026-09-13, counterparty_country: GB}
+      - {id: T7, account: A1, type: WIRE_OUT, direction: DEBIT, amount: 3000, date: 2026-09-30, counterparty_country: BR}
+      - {id: T8, account: A2, type: WIRE_OUT, direction: DEBIT, amount: 2000, date: 2026-09-28, counterparty_country: GB}
+      - {id: T9, account: A2, type: WIRE_OUT, direction: DEBIT, amount: 2000, date: 2026-09-25, counterparty_country: GB}
+      - {id: T10, account: A2, type: WIRE_OUT, direction: DEBIT, amount: 2000, date: 2026-09-22, counterparty_country: GB}
+      - {id: T11, account: A2, type: WIRE_OUT, direction: DEBIT, amount: 2000, date: 2026-09-19, counterparty_country: GB}
+      - {id: T12, account: A2, type: WIRE_OUT, direction: DEBIT, amount: 2000, date: 2026-09-16, counterparty_country: GB}
+      - {id: T13, account: A2, type: WIRE_OUT, direction: DEBIT, amount: 2000, date: 2026-09-13, counterparty_country: GB}
+      - {id: T14, account: A2, type: WIRE_OUT, direction: DEBIT, amount: 3000, date: 2026-09-30, counterparty_country: GB}
+      - {id: T15, account: A3, type: WIRE_OUT, direction: DEBIT, amount: 2000, date: 2026-09-26, counterparty_country: GB}
+      - {id: T16, account: A3, type: WIRE_OUT, direction: DEBIT, amount: 2000, date: 2026-09-21, counterparty_country: GB}
+      - {id: T17, account: A3, type: WIRE_OUT, direction: DEBIT, amount: 3000, date: 2026-09-30, counterparty_country: BR}
+      - {id: T18, account: A4, type: WIRE_OUT, direction: DEBIT, amount: 2000, date: 2026-09-28, counterparty_country: GB}
+      - {id: T19, account: A4, type: WIRE_OUT, direction: DEBIT, amount: 2000, date: 2026-09-25, counterparty_country: GB}
+      - {id: T20, account: A4, type: WIRE_OUT, direction: DEBIT, amount: 2000, date: 2026-09-22, counterparty_country: GB}
+      - {id: T21, account: A4, type: WIRE_OUT, direction: DEBIT, amount: 2000, date: 2026-09-19, counterparty_country: GB}
+      - {id: T22, account: A4, type: WIRE_OUT, direction: DEBIT, amount: 2000, date: 2026-09-16, counterparty_country: GB}
+      - {id: T23, account: A4, type: WIRE_OUT, direction: DEBIT, amount: 2000, date: 2026-09-13, counterparty_country: GB}
+      - {id: T24, account: A4, type: WIRE_OUT, direction: DEBIT, amount: 500, date: 2026-09-30, counterparty_country: BR}
+      - {id: T25, account: A5, type: WIRE_OUT, direction: DEBIT, amount: 2000, date: 2026-09-28, counterparty_country: GB}
+      - {id: T26, account: A5, type: WIRE_OUT, direction: DEBIT, amount: 2000, date: 2026-09-25, counterparty_country: GB}
+      - {id: T27, account: A5, type: WIRE_OUT, direction: DEBIT, amount: 2000, date: 2026-09-22, counterparty_country: GB}
+      - {id: T28, account: A5, type: WIRE_OUT, direction: DEBIT, amount: 2000, date: 2026-09-19, counterparty_country: GB}
+      - {id: T29, account: A5, type: WIRE_OUT, direction: DEBIT, amount: 2000, date: 2026-09-16, counterparty_country: GB}
+      - {id: T30, account: A5, type: WIRE_OUT, direction: DEBIT, amount: 2000, date: 2026-09-13, counterparty_country: GB}
+      - {id: T31, account: A5, type: WIRE_OUT, direction: DEBIT, amount: 3000, date: 2026-09-30}
+    expect_alerts: [A1]
+  - name: a country used only in the past, with no wire on the as-of day, cannot alert
+    as_of: 2026-09-30
+    accounts: [{id: A1, product: DEPOSIT}]
+    txns:
+      - {id: T1, account: A1, type: WIRE_OUT, direction: DEBIT, amount: 2000, date: 2026-09-27, counterparty_country: BR}
+    expect_alerts: []

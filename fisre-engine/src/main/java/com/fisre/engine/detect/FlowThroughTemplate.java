@@ -47,7 +47,7 @@ public class FlowThroughTemplate extends TemplateSupport {
                 + "JOIN (SELECT t.account_id, SUM(t.amount) AS amt FROM " + mst + ".txn t WHERE " + out
                 + " AND t.posting_date BETWEEN :start AND :end GROUP BY t.account_id) o ON o.account_id = a.account_id "
                 + "WHERE " + productClause(c, params) + " AND a.account_id IN (" + candidates + ") AND i.amt >= :min_in AND o.amt * 100 >= i.amt * :min_out_pct";
-        String evidence = "SELECT t.account_id, t.transaction_id FROM " + mst + ".txn t "
+        String evidence = "SELECT t.account_id, t.transaction_id, t.posting_date FROM " + mst + ".txn t "
                 + "WHERE t.account_id IN (SELECT h.account_id FROM {hits}) AND t.posting_date BETWEEN :start AND :end "
                 + "AND ((" + in + ") OR (" + out + "))";
         return new Built(hits, evidence, params);

@@ -4,7 +4,7 @@
 
 | ID | Requirement | Status |
 |---|---|---|
-| REQ-DET-001 | For each active rule, each account that hits gets one alert for the business date, addressed to the account's primary customer, with the rule code and version, a JSON evidence document and the list of transactions behind it. | Implemented |
+| REQ-DET-001 | For each active rule, each account that hits gets one alert for the business date, addressed to the account's primary customer, with the rule code and version, a JSON evidence document and the list of transactions behind it (each link carries the posting date so details can be read from one partition). | Implemented |
 | REQ-DET-002 | Detection for a business date is refused unless that date has a live (promoted) batch. | Implemented |
 | REQ-DET-003 | Re-running a business date replaces the rule's alerts that have not been handed off; there are never two alerts for the same rule, account and date. | Implemented |
 | REQ-DET-004 | An alert already handed off to case management is never deleted or duplicated by a re-run. | Implemented |

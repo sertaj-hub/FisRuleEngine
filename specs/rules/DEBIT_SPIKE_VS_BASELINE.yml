@@ -1,0 +1,85 @@
+code: DEBIT_SPIKE_VS_BASELINE
+name: Debit activity far above the account's own norm
+description: >
+  Debits on the as-of day total at least five times the account's average daily debits over the previous 30 days
+  and at least $5,000, for an account with at least five active days in that period.
+template: BASELINE_DEVIATION
+status: ACTIVE
+suppress_days: 3
+config:
+  baseline_days: 30
+  filter: { direction: DEBIT }
+  metric: SUM
+  multiplier: 5
+  min_value: 5000
+  min_active_days: 5
+tests:
+  - name: ordinary account suddenly sends 6000 (average is 167 a day), and accounts that must not alert
+    as_of: 2026-09-30
+    accounts: [{id: A1, product: DEPOSIT}, {id: A2, product: DEPOSIT}, {id: A3, product: DEPOSIT}, {id: A4, product: DEPOSIT}, {id: A5, product: DEPOSIT}]
+    txns:
+      - {id: T1, account: A1, type: ACH_DEBIT, direction: DEBIT, amount: 500, date: 2026-09-29}
+      - {id: T2, account: A1, type: ACH_DEBIT, direction: DEBIT, amount: 500, date: 2026-09-28}
+      - {id: T3, account: A1, type: ACH_DEBIT, direction: DEBIT, amount: 500, date: 2026-09-27}
+      - {id: T4, account: A1, type: ACH_DEBIT, direction: DEBIT, amount: 500, date: 2026-09-26}
+      - {id: T5, account: A1, type: ACH_DEBIT, direction: DEBIT, amount: 500, date: 2026-09-25}
+      - {id: T6, account: A1, type: ACH_DEBIT, direction: DEBIT, amount: 500, date: 2026-09-24}
+      - {id: T7, account: A1, type: ACH_DEBIT, direction: DEBIT, amount: 500, date: 2026-09-23}
+      - {id: T8, account: A1, type: ACH_DEBIT, direction: DEBIT, amount: 500, date: 2026-09-22}
+      - {id: T9, account: A1, type: ACH_DEBIT, direction: DEBIT, amount: 500, date: 2026-09-21}
+      - {id: T10, account: A1, type: ACH_DEBIT, direction: DEBIT, amount: 500, date: 2026-09-20}
+      - {id: T11, account: A1, type: WIRE_OUT, direction: DEBIT, amount: 6000, date: 2026-09-30}
+      - {id: T12, account: A2, type: ACH_DEBIT, direction: DEBIT, amount: 500, date: 2026-09-29}
+      - {id: T13, account: A2, type: ACH_DEBIT, direction: DEBIT, amount: 500, date: 2026-09-28}
+      - {id: T14, account: A2, type: ACH_DEBIT, direction: DEBIT, amount: 500, date: 2026-09-27}
+      - {id: T15, account: A2, type: ACH_DEBIT, direction: DEBIT, amount: 500, date: 2026-09-26}
+      - {id: T16, account: A2, type: ACH_DEBIT, direction: DEBIT, amount: 500, date: 2026-09-25}
+      - {id: T17, account: A2, type: ACH_DEBIT, direction: DEBIT, amount: 500, date: 2026-09-24}
+      - {id: T18, account: A2, type: ACH_DEBIT, direction: DEBIT, amount: 500, date: 2026-09-23}
+      - {id: T19, account: A2, type: ACH_DEBIT, direction: DEBIT, amount: 500, date: 2026-09-22}
+      - {id: T20, account: A2, type: ACH_DEBIT, direction: DEBIT, amount: 500, date: 2026-09-21}
+      - {id: T21, account: A2, type: ACH_DEBIT, direction: DEBIT, amount: 500, date: 2026-09-20}
+      - {id: T22, account: A2, type: ACH_DEBIT, direction: DEBIT, amount: 600, date: 2026-09-30}
+      - {id: T23, account: A3, type: ACH_DEBIT, direction: DEBIT, amount: 500, date: 2026-09-27}
+      - {id: T24, account: A3, type: ACH_DEBIT, direction: DEBIT, amount: 500, date: 2026-09-21}
+      - {id: T25, account: A3, type: WIRE_OUT, direction: DEBIT, amount: 8000, date: 2026-09-30}
+      - {id: T26, account: A4, type: ACH_DEBIT, direction: DEBIT, amount: 3000, date: 2026-09-29}
+      - {id: T27, account: A4, type: ACH_DEBIT, direction: DEBIT, amount: 3000, date: 2026-09-28}
+      - {id: T28, account: A4, type: ACH_DEBIT, direction: DEBIT, amount: 3000, date: 2026-09-27}
+      - {id: T29, account: A4, type: ACH_DEBIT, direction: DEBIT, amount: 3000, date: 2026-09-26}
+      - {id: T30, account: A4, type: ACH_DEBIT, direction: DEBIT, amount: 3000, date: 2026-09-25}
+      - {id: T31, account: A4, type: ACH_DEBIT, direction: DEBIT, amount: 3000, date: 2026-09-24}
+      - {id: T32, account: A4, type: ACH_DEBIT, direction: DEBIT, amount: 3000, date: 2026-09-23}
+      - {id: T33, account: A4, type: ACH_DEBIT, direction: DEBIT, amount: 3000, date: 2026-09-22}
+      - {id: T34, account: A4, type: ACH_DEBIT, direction: DEBIT, amount: 3000, date: 2026-09-21}
+      - {id: T35, account: A4, type: ACH_DEBIT, direction: DEBIT, amount: 3000, date: 2026-09-20}
+      - {id: T36, account: A4, type: ACH_DEBIT, direction: DEBIT, amount: 3000, date: 2026-09-19}
+      - {id: T37, account: A4, type: ACH_DEBIT, direction: DEBIT, amount: 3000, date: 2026-09-18}
+      - {id: T38, account: A4, type: ACH_DEBIT, direction: DEBIT, amount: 3000, date: 2026-09-17}
+      - {id: T39, account: A4, type: ACH_DEBIT, direction: DEBIT, amount: 3000, date: 2026-09-16}
+      - {id: T40, account: A4, type: ACH_DEBIT, direction: DEBIT, amount: 3000, date: 2026-09-15}
+      - {id: T41, account: A4, type: ACH_DEBIT, direction: DEBIT, amount: 3000, date: 2026-09-14}
+      - {id: T42, account: A4, type: ACH_DEBIT, direction: DEBIT, amount: 3000, date: 2026-09-13}
+      - {id: T43, account: A4, type: ACH_DEBIT, direction: DEBIT, amount: 3000, date: 2026-09-12}
+      - {id: T44, account: A4, type: ACH_DEBIT, direction: DEBIT, amount: 3000, date: 2026-09-11}
+      - {id: T45, account: A4, type: ACH_DEBIT, direction: DEBIT, amount: 3000, date: 2026-09-10}
+      - {id: T46, account: A4, type: ACH_DEBIT, direction: DEBIT, amount: 3000, date: 2026-09-09}
+      - {id: T47, account: A4, type: ACH_DEBIT, direction: DEBIT, amount: 3000, date: 2026-09-08}
+      - {id: T48, account: A4, type: ACH_DEBIT, direction: DEBIT, amount: 3000, date: 2026-09-07}
+      - {id: T49, account: A4, type: ACH_DEBIT, direction: DEBIT, amount: 3000, date: 2026-09-06}
+      - {id: T50, account: A4, type: ACH_DEBIT, direction: DEBIT, amount: 3000, date: 2026-09-05}
+      - {id: T51, account: A4, type: ACH_DEBIT, direction: DEBIT, amount: 3000, date: 2026-09-04}
+      - {id: T52, account: A4, type: ACH_DEBIT, direction: DEBIT, amount: 3000, date: 2026-09-03}
+      - {id: T53, account: A4, type: ACH_DEBIT, direction: DEBIT, amount: 3000, date: 2026-09-02}
+      - {id: T54, account: A4, type: ACH_DEBIT, direction: DEBIT, amount: 3000, date: 2026-09-01}
+      - {id: T55, account: A4, type: ACH_DEBIT, direction: DEBIT, amount: 3000, date: 2026-08-31}
+      - {id: T56, account: A4, type: WIRE_OUT, direction: DEBIT, amount: 6000, date: 2026-09-30}
+      - {id: T57, account: A5, type: WIRE_OUT, direction: DEBIT, amount: 9000, date: 2026-09-30}
+    expect_alerts: [A1]
+  - name: nothing happens on the as-of day, so nothing can alert even with a spiky past
+    as_of: 2026-09-30
+    accounts: [{id: A1, product: DEPOSIT}]
+    txns:
+      - {id: T1, account: A1, type: ACH_DEBIT, direction: DEBIT, amount: 500, date: 2026-09-25}
+      - {id: T2, account: A1, type: ACH_DEBIT, direction: DEBIT, amount: 20000, date: 2026-09-28}
+    expect_alerts: []

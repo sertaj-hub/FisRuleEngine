@@ -40,7 +40,7 @@ public class DormantReactivationTemplate extends TemplateSupport {
                 + "WHERE " + productClause(c, params) + " AND a.open_date < :dormant_start AND x.amt >= :min_total "
                 + "AND NOT EXISTS (SELECT 1 FROM " + mst + ".txn p WHERE p.account_id = a.account_id "
                 + "AND p.posting_date >= :dormant_start AND p.posting_date < :end)";
-        String evidence = "SELECT t.account_id, t.transaction_id FROM " + mst + ".txn t "
+        String evidence = "SELECT t.account_id, t.transaction_id, t.posting_date FROM " + mst + ".txn t "
                 + "WHERE t.account_id IN (SELECT h.account_id FROM {hits}) AND " + f + " AND t.posting_date = :end";
         return new Built(hits, evidence, params);
     }

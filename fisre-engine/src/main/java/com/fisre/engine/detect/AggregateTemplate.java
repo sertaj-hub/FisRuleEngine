@@ -46,7 +46,7 @@ public class AggregateTemplate extends TemplateSupport {
                 + "AND t.account_id IN (" + candidates + ") "
                 + "GROUP BY a.account_id, a.primary_customer_id, a.product_type "
                 + "HAVING COUNT(*) >= :min_count AND SUM(t.amount) >= :min_sum";
-        String evidence = "SELECT t.account_id, t.transaction_id FROM " + mst + ".txn t "
+        String evidence = "SELECT t.account_id, t.transaction_id, t.posting_date FROM " + mst + ".txn t "
                 + "WHERE t.account_id IN (SELECT h.account_id FROM {hits}) AND " + f + " AND t.posting_date BETWEEN :start AND :end";
         return new Built(hits, evidence, params);
     }
