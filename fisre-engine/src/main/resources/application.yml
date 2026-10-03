@@ -17,6 +17,7 @@ fisre:
     detect-parallelism: ${FISRE_DETECT_PARALLELISM:4}
     parallelism: ${FISRE_PARALLELISM:2}                      # concurrent batches in promote-loaded
     reject-sample-size: ${FISRE_REJECT_SAMPLE_SIZE:100}
+    allow-nested-loops: ${FISRE_ALLOW_NESTED_LOOPS:false}    # detection plans use hash joins; true lets PostgreSQL choose
   bench:
     txns: ${FISRE_BENCH_TXNS:1000}
     accounts: ${FISRE_BENCH_ACCOUNTS:100}

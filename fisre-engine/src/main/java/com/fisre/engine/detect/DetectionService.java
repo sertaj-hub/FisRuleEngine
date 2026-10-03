@@ -113,6 +113,11 @@ public class DetectionService {
             throw new IllegalStateException("Unknown template '" + r.template() + "'");
         }
         t.validate(r.config());
+        if (!tuning.allowNestedLoops()) {
+            // Each rule is one large set operation. PostgreSQL misjudged the candidate set (1 row, really ~160k) and chose
+            // an index probe per account: 110+ s against 1.4 s for hash joins in the 5M-row benchmark (ADR-0005).
+            jdbc.getJdbcOperations().execute("SET LOCAL enable_nestloop = off");
+        }
         Template.Built b = t.build(r.config(), asOf, mst);
         Map<String, Object> params = new HashMap<>(b.params());
         params.put("rule_id", r.id());

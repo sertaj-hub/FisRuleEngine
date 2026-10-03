@@ -11,9 +11,9 @@ public record FisreProperties(String dbVendor, String job, String batchId, Strin
 
     /** Scale and behaviour knobs (ADR-0005). */
     public record Tuning(int postingOffsetDays, int duplicateLookbackDays, int retentionMonths, int maxEvidenceTxns,
-                         int detectParallelism, int parallelism, int rejectSampleSize) {
+                         int detectParallelism, int parallelism, int rejectSampleSize, boolean allowNestedLoops) {
         public static Tuning defaults() {
-            return new Tuning(1, 3, 13, 200, 4, 2, 100);
+            return new Tuning(1, 3, 13, 200, 4, 2, 100, false);
         }
     }
 
