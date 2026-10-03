@@ -38,7 +38,8 @@ public class Fixtures {
 
     public void resetAll() {
         jdbc.execute("DROP TRIGGER IF EXISTS fail_acct ON " + mst + ".account");
-        for (String t : new String[] {aml + ".alert", aml + ".rule_run", aml + ".rule", aml + ".nightly_run"}) {
+        purgeAlerts();
+        for (String t : new String[] {aml + ".rule_run", aml + ".rule", aml + ".nightly_run"}) {
             jdbc.update("DELETE FROM " + t);
         }
         for (String p : partitions(mst, "txn")) {
@@ -57,6 +58,18 @@ public class Fixtures {
         for (String t : new String[] {aml + ".load_reject", aml + ".load_batch_entity", aml + ".load_batch"}) {
             jdbc.update("DELETE FROM " + t);
         }
+    }
+
+    /** Handed-off alerts are immutable; tests purge them with the documented bypass, on one connection. */
+    public void purgeAlerts() {
+        jdbc.execute((org.springframework.jdbc.core.ConnectionCallback<Void>) con -> {
+            try (java.sql.Statement st = con.createStatement()) {
+                st.execute("SET aml.allow_alert_purge = 'on'");
+                st.execute("DELETE FROM " + aml + ".alert");
+                st.execute("RESET aml.allow_alert_purge");
+            }
+            return null;
+        });
     }
 
     /** A promoted batch for the business date, so detection is allowed to run. */

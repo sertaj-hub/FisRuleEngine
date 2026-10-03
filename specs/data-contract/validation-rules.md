@@ -21,4 +21,6 @@ Fix by correcting stg and `reopen`, or `clean` and reload under a new batch id. 
 | TXN-006 | txn | `txn_type` not in `mst.ref_txn_type` |
 | TXN-007 | txn | `currency` missing |
 | TXN-008 | txn | `transaction_id` appears more than once in the batch |
-| TXN-009 | txn | `transaction_id` already in `mst.txn` from another batch (the live batch being replaced is excluded) |
+| TXN-009 | txn | `transaction_id` already in `mst.txn` within the previous `duplicate-lookback-days` posting days |
+| TXN-010 | txn | `posting_date` is not the batch business date minus the posting offset |
+| VOL-001 | batch | the batch's transaction count is below the volume threshold of the trailing average (REQ-BAT-012) |

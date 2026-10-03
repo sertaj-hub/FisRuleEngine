@@ -47,7 +47,8 @@ public class BatchRepository {
 
     /** Atomically moves a batch from {@code from} to {@code to}; fails if it is in any other status. */
     public void transition(String batchId, String from, String to) {
-        int n = jdbc.update("UPDATE " + batch + " SET status = :to WHERE batch_id = :id AND status = :from",
+        int n = jdbc.update("UPDATE " + batch + " SET status = :to" + ("PROMOTING".equals(to) ? ", claimed_ts = " + dialect.now() : "")
+                + " WHERE batch_id = :id AND status = :from",
                 Map.of("id", batchId, "from", from, "to", to));
         if (n != 1) {
             throw new IllegalStateException("Batch '" + batchId + "' is in status " + get(batchId).status() + ", expected " + from);
@@ -109,5 +110,20 @@ public class BatchRepository {
     public void savePromoted(String batchId, String entity, long promoted) {
         jdbc.update("UPDATE " + batchEntity + " SET promoted_cnt = :p WHERE batch_id = :id AND entity = :e",
                 Map.of("id", batchId, "e", entity, "p", promoted));
+    }
+
+    public record Volume(long days, double average) {}
+
+    /** Promoted transaction counts of the live batches for the {@code days} business days before {@code businessDate}. */
+    public Volume trailingTxnVolume(LocalDate businessDate, int days) {
+        return jdbc.query("SELECT COUNT(*), COALESCE(AVG(e.promoted_cnt), 0) FROM " + batch + " b JOIN " + batchEntity
+                        + " e ON e.batch_id = b.batch_id AND e.entity = 'TXN' WHERE b.status IN ('PROMOTED', 'CLEANED')"
+                        + " AND b.business_date < :d AND b.business_date >= :from",
+                new MapSqlParameterSource().addValue("d", java.sql.Date.valueOf(businessDate))
+                        .addValue("from", java.sql.Date.valueOf(businessDate.minusDays(days))),
+                rs -> {
+                    rs.next();
+                    return new Volume(rs.getLong(1), rs.getDouble(2));
+                });
     }
 }

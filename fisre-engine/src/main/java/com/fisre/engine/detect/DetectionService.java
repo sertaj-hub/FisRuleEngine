@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fisre.engine.config.FisreProperties;
 import com.fisre.engine.db.Dialect;
+import com.fisre.engine.promotion.PartitionCatalog;
 import java.time.LocalDate;
 import java.util.HashMap;
 import java.util.ArrayList;
@@ -43,9 +44,10 @@ public class DetectionService {
     private final String mst;
     private final String aml;
     private final FisreProperties.Tuning tuning;
+    private final PartitionCatalog catalog;
 
     public DetectionService(NamedParameterJdbcTemplate jdbc, TransactionTemplate tx, Dialect dialect,
-                            List<Template> templates, FisreProperties props) {
+                            List<Template> templates, FisreProperties props, PartitionCatalog catalog) {
         this.jdbc = jdbc;
         this.tx = tx;
         this.dialect = dialect;
@@ -53,6 +55,7 @@ public class DetectionService {
         this.mst = props.schemas().mst();
         this.aml = props.schemas().aml();
         this.tuning = props.tuning();
+        this.catalog = catalog;
     }
 
     public Result detect(LocalDate date) {
@@ -62,6 +65,11 @@ public class DetectionService {
             throw new IllegalStateException("No live (promoted) batch for business date " + date + "; promote a batch first");
         }
         LocalDate asOf = date.minusDays(tuning.postingOffsetDays());
+        List<LocalDate> gaps = catalog.missingDays(asOf.minusDays(29), asOf);
+        if (!gaps.isEmpty()) {
+            log.warn("{} posting day(s) missing in the 30 days before {}: {}. Window and baseline rules see less history than intended.",
+                    gaps.size(), asOf, gaps.stream().limit(10).toList());
+        }
         List<ActiveRule> rules = activeRules();
         ExecutorService pool = Executors.newFixedThreadPool(Math.max(1, Math.min(tuning.detectParallelism(), Math.max(1, rules.size()))));
         List<Future<Long>> futures = new ArrayList<>();
@@ -113,6 +121,7 @@ public class DetectionService {
             throw new IllegalStateException("Unknown template '" + r.template() + "'");
         }
         t.validate(r.config());
+        jdbc.getJdbcOperations().execute("SET LOCAL statement_timeout = " + (tuning.ruleTimeoutSeconds() * 1000L));
         if (!tuning.allowNestedLoops()) {
             // Each rule is one large set operation. PostgreSQL misjudged the candidate set (1 row, really ~160k) and chose
             // an index probe per account: 110+ s against 1.4 s for hash joins in the 5M-row benchmark (ADR-0005).
@@ -147,7 +156,7 @@ public class DetectionService {
                 + "SELECT x.account_id, x.transaction_id, x.posting_date FROM (SELECT v.account_id, v.transaction_id, v.posting_date, ROW_NUMBER() OVER"
                 + " (PARTITION BY v.account_id ORDER BY v.transaction_id) AS rn FROM (" + b.evidenceSql().replace("{hits}", hits)
                 + ") v) x WHERE x.rn <= :max_evidence) e JOIN " + aml + ".alert al ON al.rule_code = :rule_code"
-                + " AND al.business_date = :d AND al.account_id = e.account_id ON CONFLICT DO NOTHING", params);
+                + " AND al.business_date = :d AND al.account_id = e.account_id AND al.handed_off_ts IS NULL ON CONFLICT DO NOTHING", params);
         return created;
     }
 

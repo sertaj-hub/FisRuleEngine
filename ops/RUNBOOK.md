@@ -30,6 +30,20 @@ Re-running `nightly` for the same batch after a later step failed is safe: promo
 - Retention: part of `nightly`; or `FISRE_JOB=retain FISRE_BUSINESS_DATE=D` (keeps 13 months, `FISRE_RETENTION_MONTHS`).
 - Synthetic data for demos and tests: `FISRE_JOB=generate` (see README).
 
+## Monitoring and health
+
+- `FISRE_JOB=health [FISRE_BUSINESS_DATE=D]` (read-only, no lock) prints findings and exits non-zero only for CRITICAL ones: a batch stuck in `PROMOTING`, a rule that failed and has not succeeded since, and (with a date) an incomplete nightly run. WARN findings are an unacknowledged-alert backlog, missing posting days inside the loaded range, and leftover `txn_new_*` build tables. Run it after the nightly job from the scheduler and alert on a non-zero exit.
+- Views for dashboards: `aml.v_ops_batches` (last 45 days, with transaction counts), `aml.v_ops_failures` (last 7 days of failed batches, rules and nightly steps), `aml.v_ops_alert_backlog` (unsent alerts per business date).
+- A new batch whose transaction count is below 50% of the trailing 7-day average fails with `VOL-001` (`aml.load_reject`): a feed that was cut short. If the day really was that quiet, reload it after agreeing the exception, or set `FISRE_VOLUME_LOW_PERCENT` lower for that run.
+
+## Safety limits
+
+- Only one mutating engine job runs at a time. If a job refuses to start with "another engine job holds the database lock", wait for the running job (see `aml.nightly_run`); the lock disappears with the process, even after a crash.
+- Every statement is bounded by `FISRE_STATEMENT_TIMEOUT` (default 1h) and each rule by `FISRE_RULE_TIMEOUT_SECONDS` (default 1800). A rule that times out is recorded `FAILED` in `aml.rule_run`.
+- The packaged application refuses the default database password. Set `FISRE_DB_PASSWORD`; `FISRE_ALLOW_DEFAULT_CREDENTIALS=true` is for local development only.
+- Roles and least privilege: `ops/db/postgresql/roles.sql`. Handed-off alerts are immutable (trigger); a purge under change control uses `SET aml.allow_alert_purge = 'on'` on that session, and should be agreed with compliance first.
+- Backup and restore: `ops/BACKUP_RESTORE.md`.
+
 ## Database settings that matter
 
 Parallel query and index builds drive promote and detect speed: `max_parallel_workers_per_gather` (4 or more), `max_parallel_maintenance_workers`, `work_mem` (64 MB or more for the validation and detection joins), `shared_buffers` (25% of RAM), `maintenance_work_mem` (1 GB or more for index builds). Staging tables are unlogged (no WAL), master partitions are logged.

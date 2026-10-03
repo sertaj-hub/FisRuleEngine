@@ -9,4 +9,5 @@ Batch AML detection platform (US BSA; cards, loans, deposits). Alerts will feed 
 - Scale (ADR-0005): `txn` is partitioned by posting day and built offline then swapped in; staging is one unlogged partition per batch; never UPDATE staged rows; never put correlated EXISTS or OR-of-subselects in a per-row CASE (use joins or separate queries).
 - Batch model: a batch (one business date) succeeds or fails as a whole (ADR-0003, `specs/requirements/batch.md`).
 - Rules are configured templates, not code (ADR-0004): a new rule is a YAML file in `specs/rules/` with test scenarios; `RuleSpecIT` runs them. No per-rule severity.
+- Hardening (ADR-0007): one mutating job at a time (`JobLock`), statement and rule timeouts, handed-off alerts are immutable, schema names are validated, config values are always bound parameters, the app refuses the default DB password. Run jars locally with `FISRE_ALLOW_DEFAULT_CREDENTIALS=true`.
 - Out of scope: sanctions/watchlist, KYC scoring, real-time detection.

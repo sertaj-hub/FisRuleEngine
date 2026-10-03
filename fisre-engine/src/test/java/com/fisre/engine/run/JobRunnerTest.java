@@ -20,8 +20,13 @@ class JobRunnerTest {
     }
 
     private static JobRunner runner(FisreProperties props, com.fisre.engine.detect.DetectionService detection, NightlyService nightly) {
+        return runner(props, detection, nightly, mock(HealthService.class));
+    }
+
+    private static JobRunner runner(FisreProperties props, com.fisre.engine.detect.DetectionService detection, NightlyService nightly, HealthService health) {
         return new JobRunner(props, mock(BatchService.class), mock(com.fisre.engine.rules.RuleLoader.class), detection,
-                mock(com.fisre.engine.promotion.RetentionService.class), mock(com.fisre.engine.promotion.SyntheticData.class), nightly);
+                mock(com.fisre.engine.promotion.RetentionService.class), mock(com.fisre.engine.promotion.SyntheticData.class), nightly,
+                mock(JobLock.class), health);
     }
 
     @Test
@@ -60,5 +65,21 @@ class JobRunnerTest {
                 new NightlyService.Step("RETAIN", "SKIPPED", "an earlier step failed")));
         assertThatThrownBy(() -> runner(Fixtures.props("nightly", "B1", "2026-10-01"), detection, nightly).run(null))
                 .hasMessageContaining("failed at DETECT").hasMessageContaining("2 of 7");
+    }
+
+    @Test
+    @Req("REQ-HLT-002")
+    void healthExitsNonZeroOnlyForCriticalFindings() {
+        var health = mock(HealthService.class);
+        var detection = mock(com.fisre.engine.detect.DetectionService.class);
+        var props = Fixtures.props("health", "", "2026-10-01");
+        org.mockito.Mockito.when(health.check(org.mockito.ArgumentMatchers.any())).thenReturn(java.util.List.of(
+                new HealthService.Finding("WARN", "ALERT_BACKLOG", "3 alerts waiting")));
+        org.assertj.core.api.Assertions.assertThatCode(() -> runner(props, detection, mock(NightlyService.class), health).run(null)).doesNotThrowAnyException();
+
+        org.mockito.Mockito.when(health.check(org.mockito.ArgumentMatchers.any())).thenReturn(java.util.List.of(
+                new HealthService.Finding("WARN", "ALERT_BACKLOG", "3 alerts waiting"),
+                new HealthService.Finding("CRITICAL", "STUCK_BATCH", "stuck")));
+        assertThatThrownBy(() -> runner(props, detection, mock(NightlyService.class), health).run(null)).hasMessageContaining("1 critical problem");
     }
 }

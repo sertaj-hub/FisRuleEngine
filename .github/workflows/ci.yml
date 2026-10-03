@@ -20,3 +20,13 @@ jobs:
         run: PGPASSWORD=fisre psql -h localhost -U fisre -d fisre -f ops/db/postgresql/compose-init.sql
       - name: Build, unit tests, spec gate, integration tests
         run: mvn -B verify
+
+  # Known-vulnerable dependencies (ADR-0007). Needs a free NVD API key in the repository secret NVD_API_KEY, or it is slow.
+  dependency-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: 21, cache: maven }
+      - name: OWASP dependency check (fails on CVSS 7 or higher)
+        run: mvn -B -DskipTests org.owasp:dependency-check-maven:check -DfailBuildOnCVSS=7 -DnvdApiKey=${{ secrets.NVD_API_KEY }}

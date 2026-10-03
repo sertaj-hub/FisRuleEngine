@@ -9,7 +9,7 @@ bank ETL ─► stg (customer, account, txn, tagged batch_id) ─[promote batch]
 A **batch** is one business date and succeeds or fails as a whole. The 1 am batch for business date D carries the transactions posted on **D-1** (`FISRE_POSTING_OFFSET_DAYS`, default 1). On success its staging partitions are dropped; on failure
 fix stg and `reopen`, or `clean` and reload under a new batch id. The ETL registers a batch by inserting into `aml.load_batch`, which creates its staging partitions `<table>_b<batch_seq>`; load straight into those for speed. Protocol: [`specs/data-contract/batch-protocol.md`](specs/data-contract/batch-protocol.md).
 
-Status: Phases 0 to 5 done (foundation, batch promotion, rule framework, nine rules, partitioned scale design, nightly run, database handoff to case management). Designed for 10M transactions a day and 13 months of history ([ADR-0005](specs/adr/0005-scale-design.md)).
+Status: Phases 0 to 5 done and hardened (foundation, batch promotion, rule framework, nine rules, partitioned scale design, nightly run, database handoff to case management, safety limits, audit, health checks). Designed for 10M transactions a day and 13 months of history ([ADR-0005](specs/adr/0005-scale-design.md)).
 Specs: [`specs/`](specs/README.md). Decisions: [`specs/adr/`](specs/adr).
 
 ## Run
@@ -17,9 +17,10 @@ Specs: [`specs/`](specs/README.md). Decisions: [`specs/adr/`](specs/adr).
 ```bash
 docker compose up -d postgres            # or any PostgreSQL with schemas stg, mst, aml (ops/db/postgresql/)
 export FISRE_DB_URL=jdbc:postgresql://localhost:5432/fisre FISRE_DB_USER=fisre FISRE_DB_PASSWORD=fisre
+export FISRE_ALLOW_DEFAULT_CREDENTIALS=true   # local development only: the app refuses the default password otherwise
 mvn -q -pl fisre-engine package -DskipTests
 # every run migrates the schema first, then runs one job (none = migrate only):
-#   nightly | promote | promote-loaded | clean | reopen | load-rules | detect | retain | generate
+#   nightly | promote | promote-loaded | clean | reopen | load-rules | detect | retain | generate | health
 JAR=fisre-engine/target/fisre-engine-0.1.0-SNAPSHOT.jar
 FISRE_JOB=nightly FISRE_BATCH_ID=2026-10-01-01 FISRE_BUSINESS_DATE=2026-10-01 java -jar $JAR   # the one nightly command: promote, detect, retain
 FISRE_JOB=promote FISRE_BATCH_ID=2026-10-01-01 java -jar $JAR      # stg -> mst for one batch

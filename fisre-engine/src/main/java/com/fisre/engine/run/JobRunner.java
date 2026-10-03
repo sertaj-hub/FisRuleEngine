@@ -29,9 +29,11 @@ public class JobRunner implements ApplicationRunner {
     private final RetentionService retention;
     private final SyntheticData synthetic;
     private final NightlyService nightly;
+    private final JobLock lock;
+    private final HealthService health;
 
     public JobRunner(FisreProperties props, BatchService batches, RuleLoader rules, DetectionService detection,
-                     RetentionService retention, SyntheticData synthetic, NightlyService nightly) {
+                     RetentionService retention, SyntheticData synthetic, NightlyService nightly, JobLock lock, HealthService health) {
         this.props = props;
         this.batches = batches;
         this.rules = rules;
@@ -39,6 +41,8 @@ public class JobRunner implements ApplicationRunner {
         this.retention = retention;
         this.synthetic = synthetic;
         this.nightly = nightly;
+        this.lock = lock;
+        this.health = health;
     }
 
     @Override
@@ -48,6 +52,30 @@ public class JobRunner implements ApplicationRunner {
             log.info("No job requested (fisre.job=none); schema migration only.");
             return;
         }
+        if (job.equals("health")) {
+            runHealth();
+            return;
+        }
+        try (JobLock.Held ignored = lock.acquire(job)) {   // one mutating job at a time (REQ-OPS-001)
+            runJob(job);
+        }
+    }
+
+    private void runHealth() {
+        java.util.Optional<java.time.LocalDate> date = props.businessDate() == null || props.businessDate().isBlank()
+                ? java.util.Optional.empty() : java.util.Optional.of(java.time.LocalDate.parse(props.businessDate()));
+        var findings = health.check(date);
+        if (findings.isEmpty()) {
+            log.info("Health: no findings");
+        }
+        findings.forEach(f -> log.warn("Health {} {}: {}", f.severity(), f.check(), f.message()));
+        long critical = findings.stream().filter(HealthService.Finding::critical).count();
+        if (critical > 0) {
+            throw new IllegalStateException("Health check found " + critical + " critical problem(s)");
+        }
+    }
+
+    private void runJob(String job) {
         if (job.equals("load-rules")) {
             rules.load(java.nio.file.Path.of(props.rulesDir()));
             return;
@@ -95,7 +123,7 @@ public class JobRunner implements ApplicationRunner {
         }
         String batchId = props.batchId();
         if (!java.util.Set.of("promote", "clean", "reopen").contains(job)) {
-            throw new IllegalArgumentException("Unknown fisre.job '" + job + "' (expected none, promote, promote-loaded, clean, reopen, load-rules, detect, retain, generate or nightly)");
+            throw new IllegalArgumentException("Unknown fisre.job '" + job + "' (expected none, health, promote, promote-loaded, clean, reopen, load-rules, detect, retain, generate or nightly)");
         }
         if (batchId == null || batchId.isBlank()) {
             throw new IllegalArgumentException("fisre.job=" + job + " needs fisre.batch-id (FISRE_BATCH_ID)");

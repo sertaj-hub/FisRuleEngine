@@ -1,7 +1,7 @@
 # PostgreSQL is the only vendor built and tested for now (ADR-0002); the Dialect seam keeps others possible.
 fisre:
   db-vendor: ${FISRE_DB_VENDOR:postgresql}
-  job: ${FISRE_JOB:none}                     # none | promote | promote-loaded | clean | reopen | load-rules | detect | retain | generate | nightly
+  job: ${FISRE_JOB:none}                     # none | promote | promote-loaded | clean | reopen | load-rules | detect | retain | generate | nightly | health
   batch-id: ${FISRE_BATCH_ID:}               # required by promote, clean, reopen
   business-date: ${FISRE_BUSINESS_DATE:}     # YYYY-MM-DD, required by detect, retain, generate
   rules-dir: ${FISRE_RULES_DIR:specs/rules}  # rule specs read by load-rules
@@ -18,6 +18,13 @@ fisre:
     parallelism: ${FISRE_PARALLELISM:2}                      # concurrent batches in promote-loaded
     reject-sample-size: ${FISRE_REJECT_SAMPLE_SIZE:100}
     allow-nested-loops: ${FISRE_ALLOW_NESTED_LOOPS:false}    # detection plans use hash joins; true lets PostgreSQL choose
+    rule-timeout-seconds: ${FISRE_RULE_TIMEOUT_SECONDS:1800}
+    volume-check-days: ${FISRE_VOLUME_CHECK_DAYS:7}          # 0 turns the feed volume check off
+    volume-check-min-days: ${FISRE_VOLUME_CHECK_MIN_DAYS:3}
+    volume-low-percent: ${FISRE_VOLUME_LOW_PERCENT:50}
+    volume-high-percent: ${FISRE_VOLUME_HIGH_PERCENT:200}
+    health-stuck-minutes: ${FISRE_HEALTH_STUCK_MINUTES:120}
+    health-ack-hours: ${FISRE_HEALTH_ACK_HOURS:24}
   bench:
     txns: ${FISRE_BENCH_TXNS:1000}
     accounts: ${FISRE_BENCH_ACCOUNTS:100}
@@ -29,7 +36,9 @@ spring:
   datasource:
     url: ${FISRE_DB_URL:jdbc:postgresql://localhost:5432/fisre}
     username: ${FISRE_DB_USER:fisre}
-    password: ${FISRE_DB_PASSWORD:fisre}
+    password: ${FISRE_DB_PASSWORD:fisre}      # the packaged app refuses this default unless FISRE_ALLOW_DEFAULT_CREDENTIALS=true
+    hikari:
+      connection-init-sql: SET statement_timeout = '${FISRE_STATEMENT_TIMEOUT:1h}'
   flyway:
     locations: classpath:db/migration
     default-schema: ${fisre.schemas.aml}

@@ -179,6 +179,7 @@ public class BatchService {
         Map<String, String> reasons = ValidationRule.ALL.stream().collect(Collectors.toMap(ValidationRule::id, ValidationRule::reason));
         long staged = 0;
         long rejected = 0;
+        long stagedTxns = 0;
         for (Entity e : Entity.PROMOTION_ORDER) {
             String part = stgPartition(e, b.seq());
             jdbc.getJdbcOperations().execute("ANALYZE " + part);
@@ -215,11 +216,42 @@ public class BatchService {
             batches.saveCounts(b.batchId(), e.name(), s, r);
             staged += s;
             rejected += r;
+            if (e == Entity.TXN) {
+                stagedTxns = s;
+            }
         }
         if (staged == 0) {
             return "Batch is empty: no staged rows";
         }
-        return rejected == 0 ? null : rejected + " staged row(s) failed validation; see aml.load_reject";
+        if (rejected > 0) {
+            return rejected + " staged row(s) failed validation; see aml.load_reject";
+        }
+        return volumeProblem(b, stagedTxns);
+    }
+
+    /**
+     * A feed cut short would pass every row check and silently miss alerts, so compare the day's transaction count with the
+     * trailing average of recent promoted days (REQ-BAT-012). Quiet until enough history exists.
+     */
+    private String volumeProblem(BatchRepository.Batch b, long stagedTxns) {
+        if (tuning.volumeCheckDays() <= 0) {
+            return null;
+        }
+        BatchRepository.Volume v = batches.trailingTxnVolume(b.businessDate(), tuning.volumeCheckDays());
+        if (v.days() < tuning.volumeCheckMinDays() || v.average() <= 0) {
+            return null;
+        }
+        if (stagedTxns * 100.0 < v.average() * tuning.volumeLowPercent()) {
+            String reason = String.format("VOL-001: %d transactions is below %d%% of the %d-day average of %.0f", stagedTxns,
+                    tuning.volumeLowPercent(), v.days(), v.average());
+            batches.saveReject(b.batchId(), Entity.TXN.name(), "VOL-001", reason, 1, "[]");
+            return "Volume check failed: " + reason.substring("VOL-001: ".length());
+        }
+        if (stagedTxns * 100.0 > v.average() * tuning.volumeHighPercent()) {
+            log.warn("Batch {} has {} transactions, above {}% of the {}-day average of {}; check the feed for duplicates",
+                    b.batchId(), stagedTxns, tuning.volumeHighPercent(), v.days(), Math.round(v.average()));
+        }
+        return null;
     }
 
     /** CASE expression returning the id of the first of the given rules that a staged row breaks, or NULL. */
