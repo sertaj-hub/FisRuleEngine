@@ -269,9 +269,10 @@ public class BatchService {
         for (Entity e : List.of(Entity.CUSTOMER, Entity.ACCOUNT)) {
             String part = stgPartition(e, b.seq());
             String cols = String.join(", ", e.columns());
-            // Latest staged row per key wins if a key repeats within the batch.
-            String latest = "SELECT " + cols + ", batch_id FROM " + part + " s WHERE s.stg_id = (SELECT MAX(x.stg_id) FROM "
-                    + part + " x WHERE x." + e.keyColumn() + " = s." + e.keyColumn() + ")";
+            // Latest staged row per key wins if a key repeats within the batch. DISTINCT ON sorts once; a correlated
+            // MAX() per row would scan the unindexed staging partition for every row.
+            String latest = "SELECT DISTINCT ON (" + e.keyColumn() + ") " + cols + ", batch_id FROM " + part
+                    + " ORDER BY " + e.keyColumn() + ", stg_id DESC";
             batches.savePromoted(b.batchId(), e.name(), jdbc.update(dialect.upsert(schemas.mst() + "." + e.table(), e, latest), Map.of()));
         }
         String partName = txnPartitionName(posting);
