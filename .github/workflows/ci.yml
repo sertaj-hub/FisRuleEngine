@@ -13,7 +13,7 @@ jobs:
         ports: ["5432:5432"]
         options: --health-cmd="pg_isready -U fisre" --health-interval=5s --health-retries=20
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-java@v4
         with: { distribution: temurin, java-version: 21, cache: maven }
       - name: Create schemas
@@ -25,7 +25,7 @@ jobs:
   dependency-check:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-java@v4
         with: { distribution: temurin, java-version: 21, cache: maven }
       - name: OWASP dependency check (fails on CVSS 7 or higher)
