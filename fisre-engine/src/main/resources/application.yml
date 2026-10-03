@@ -1,8 +1,10 @@
 # PostgreSQL is the only vendor built and tested for now (ADR-0002); the Dialect seam keeps others possible.
 fisre:
   db-vendor: ${FISRE_DB_VENDOR:postgresql}
-  job: ${FISRE_JOB:none}                     # none | promote | clean | reopen
+  job: ${FISRE_JOB:none}                     # none | promote | clean | reopen | load-rules | detect
   batch-id: ${FISRE_BATCH_ID:}               # required by promote, clean, reopen
+  business-date: ${FISRE_BUSINESS_DATE:}     # YYYY-MM-DD, required by detect
+  rules-dir: ${FISRE_RULES_DIR:specs/rules}  # rule specs read by load-rules
   schemas:                                   # logical schema -> physical schema/database/user
     stg: ${FISRE_SCHEMA_STG:stg}
     mst: ${FISRE_SCHEMA_MST:mst}

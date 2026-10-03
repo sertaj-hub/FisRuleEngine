@@ -1,0 +1,35 @@
+code: CARD_CASH_ADVANCE_VELOCITY
+name: Card cash advance velocity
+description: Three or more cash advances totalling at least $1,500 on a card account within seven days.
+template: AGGREGATE
+status: ACTIVE
+suppress_days: 7
+config:
+  product_types: [CARD]
+  window_days: 7
+  filter: { txn_types: [CARD_CASH_ADVANCE] }
+  min_count: 3
+  min_sum: 1500
+tests:
+  - name: four advances in a week
+    business_date: 2026-09-30
+    accounts: [{id: A1, product: CARD}]
+    txns:
+      - {id: T1, account: A1, type: CARD_CASH_ADVANCE, direction: DEBIT, amount: 500, date: 2026-09-25}
+      - {id: T2, account: A1, type: CARD_CASH_ADVANCE, direction: DEBIT, amount: 500, date: 2026-09-27}
+      - {id: T3, account: A1, type: CARD_CASH_ADVANCE, direction: DEBIT, amount: 500, date: 2026-09-29}
+      - {id: T4, account: A1, type: CARD_CASH_ADVANCE, direction: DEBIT, amount: 500, date: 2026-09-30}
+    expect_alerts: [A1]
+  - name: two advances only, or small amounts, or ordinary purchases
+    business_date: 2026-09-30
+    accounts: [{id: A1, product: CARD}, {id: A2, product: CARD}, {id: A3, product: CARD}]
+    txns:
+      - {id: T1, account: A1, type: CARD_CASH_ADVANCE, direction: DEBIT, amount: 2000, date: 2026-09-29}
+      - {id: T2, account: A1, type: CARD_CASH_ADVANCE, direction: DEBIT, amount: 2000, date: 2026-09-30}
+      - {id: T3, account: A2, type: CARD_CASH_ADVANCE, direction: DEBIT, amount: 100, date: 2026-09-28}
+      - {id: T4, account: A2, type: CARD_CASH_ADVANCE, direction: DEBIT, amount: 100, date: 2026-09-29}
+      - {id: T5, account: A2, type: CARD_CASH_ADVANCE, direction: DEBIT, amount: 100, date: 2026-09-30}
+      - {id: T6, account: A3, type: POS_PURCHASE, direction: DEBIT, amount: 900, date: 2026-09-28}
+      - {id: T7, account: A3, type: POS_PURCHASE, direction: DEBIT, amount: 900, date: 2026-09-29}
+      - {id: T8, account: A3, type: POS_PURCHASE, direction: DEBIT, amount: 900, date: 2026-09-30}
+    expect_alerts: []

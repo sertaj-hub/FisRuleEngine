@@ -13,7 +13,7 @@ import org.junit.jupiter.api.Test;
 class DialectSelectionTest {
 
     private static Dialect dialectFor(String vendor) {
-        return new DialectConfig().dialect(new FisreProperties(vendor, "none", "", new FisreProperties.Schemas("stg", "mst", "aml")));
+        return new DialectConfig().dialect(new FisreProperties(vendor, "none", "", "", "specs/rules", new FisreProperties.Schemas("stg", "mst", "aml")));
     }
 
     @Test

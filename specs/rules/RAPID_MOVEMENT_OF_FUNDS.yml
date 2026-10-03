@@ -1,0 +1,30 @@
+code: RAPID_MOVEMENT_OF_FUNDS
+name: Rapid movement of funds
+description: At least $10,000 comes in and at least 80% of it goes out again within three days.
+template: FLOW_THROUGH
+status: ACTIVE
+suppress_days: 3
+config:
+  product_types: [DEPOSIT]
+  window_days: 3
+  in:  { txn_types: [ACH_CREDIT, WIRE_IN, CHECK_DEPOSIT, CASH_DEPOSIT], direction: CREDIT }
+  out: { txn_types: [WIRE_OUT, ACH_DEBIT, CASH_WITHDRAWAL], direction: DEBIT }
+  min_in: 10000
+  min_out_pct: 80
+tests:
+  - name: wire in, almost all wired out the next day
+    business_date: 2026-09-30
+    accounts: [{id: A1, product: DEPOSIT}]
+    txns:
+      - {id: T1, account: A1, type: WIRE_IN, direction: CREDIT, amount: 50000, date: 2026-09-29}
+      - {id: T2, account: A1, type: WIRE_OUT, direction: DEBIT, amount: 48000, date: 2026-09-30}
+    expect_alerts: [A1]
+  - name: money stays in the account, or the inflow is small
+    business_date: 2026-09-30
+    accounts: [{id: A1, product: DEPOSIT}, {id: A2, product: DEPOSIT}]
+    txns:
+      - {id: T1, account: A1, type: WIRE_IN, direction: CREDIT, amount: 50000, date: 2026-09-29}
+      - {id: T2, account: A1, type: WIRE_OUT, direction: DEBIT, amount: 10000, date: 2026-09-30}
+      - {id: T3, account: A2, type: ACH_CREDIT, direction: CREDIT, amount: 2000, date: 2026-09-29}
+      - {id: T4, account: A2, type: ACH_DEBIT, direction: DEBIT, amount: 2000, date: 2026-09-30}
+    expect_alerts: []

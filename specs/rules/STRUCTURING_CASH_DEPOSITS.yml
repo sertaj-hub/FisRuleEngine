@@ -1,0 +1,42 @@
+code: STRUCTURING_CASH_DEPOSITS
+name: Possible structuring of cash deposits
+description: Several cash deposits each below $10,000 that together exceed $10,000 within five days.
+template: AGGREGATE
+status: ACTIVE
+suppress_days: 5
+config:
+  product_types: [DEPOSIT]
+  window_days: 5
+  filter: { txn_types: [CASH_DEPOSIT], min_amount: 3000, max_amount: 10000 }
+  min_count: 3
+  min_sum: 10000
+tests:
+  - name: three sub-limit deposits over four days
+    business_date: 2026-09-30
+    accounts: [{id: A1, product: DEPOSIT}]
+    txns:
+      - {id: T1, account: A1, type: CASH_DEPOSIT, direction: CREDIT, amount: 9500, date: 2026-09-27}
+      - {id: T2, account: A1, type: CASH_DEPOSIT, direction: CREDIT, amount: 9000, date: 2026-09-29}
+      - {id: T3, account: A1, type: CASH_DEPOSIT, direction: CREDIT, amount: 8000, date: 2026-09-30}
+    expect_alerts: [A1]
+  - name: only two deposits, or deposits outside the window, or small ones
+    business_date: 2026-09-30
+    accounts: [{id: A1, product: DEPOSIT}, {id: A2, product: DEPOSIT}, {id: A3, product: DEPOSIT}]
+    txns:
+      - {id: T1, account: A1, type: CASH_DEPOSIT, direction: CREDIT, amount: 9500, date: 2026-09-29}
+      - {id: T2, account: A1, type: CASH_DEPOSIT, direction: CREDIT, amount: 9500, date: 2026-09-30}
+      - {id: T3, account: A2, type: CASH_DEPOSIT, direction: CREDIT, amount: 9500, date: 2026-09-20}
+      - {id: T4, account: A2, type: CASH_DEPOSIT, direction: CREDIT, amount: 9500, date: 2026-09-21}
+      - {id: T5, account: A2, type: CASH_DEPOSIT, direction: CREDIT, amount: 9500, date: 2026-09-22}
+      - {id: T6, account: A3, type: CASH_DEPOSIT, direction: CREDIT, amount: 1000, date: 2026-09-28}
+      - {id: T7, account: A3, type: CASH_DEPOSIT, direction: CREDIT, amount: 1000, date: 2026-09-29}
+      - {id: T8, account: A3, type: CASH_DEPOSIT, direction: CREDIT, amount: 1000, date: 2026-09-30}
+    expect_alerts: []
+  - name: card accounts are out of scope
+    business_date: 2026-09-30
+    accounts: [{id: A1, product: CARD}]
+    txns:
+      - {id: T1, account: A1, type: CASH_DEPOSIT, direction: CREDIT, amount: 9500, date: 2026-09-28}
+      - {id: T2, account: A1, type: CASH_DEPOSIT, direction: CREDIT, amount: 9500, date: 2026-09-29}
+      - {id: T3, account: A1, type: CASH_DEPOSIT, direction: CREDIT, amount: 9500, date: 2026-09-30}
+    expect_alerts: []

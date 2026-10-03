@@ -1,0 +1,28 @@
+code: DORMANT_REACTIVATION
+name: Dormant deposit account suddenly active
+description: A deposit account with no transactions for 180 days has $5,000 or more of activity.
+template: DORMANT_REACTIVATION
+status: ACTIVE
+suppress_days: 0
+config:
+  product_types: [DEPOSIT]
+  dormant_days: 180
+  min_total: 5000
+tests:
+  - name: nothing for a year, then a large deposit
+    business_date: 2026-09-30
+    accounts: [{id: A1, product: DEPOSIT}]
+    txns:
+      - {id: T1, account: A1, type: ACH_CREDIT, direction: CREDIT, amount: 100, date: 2025-09-01}
+      - {id: T2, account: A1, type: WIRE_IN, direction: CREDIT, amount: 8000, date: 2026-09-30}
+    expect_alerts: [A1]
+  - name: recently active, brand new account, or small amount
+    business_date: 2026-09-30
+    accounts: [{id: A1, product: DEPOSIT}, {id: A2, product: DEPOSIT, open_date: 2026-09-01}, {id: A3, product: DEPOSIT}]
+    txns:
+      - {id: T1, account: A1, type: ACH_CREDIT, direction: CREDIT, amount: 100, date: 2026-08-15}
+      - {id: T2, account: A1, type: WIRE_IN, direction: CREDIT, amount: 8000, date: 2026-09-30}
+      - {id: T3, account: A2, type: WIRE_IN, direction: CREDIT, amount: 8000, date: 2026-09-30}
+      - {id: T4, account: A3, type: ACH_CREDIT, direction: CREDIT, amount: 100, date: 2025-09-01}
+      - {id: T5, account: A3, type: ACH_CREDIT, direction: CREDIT, amount: 300, date: 2026-09-30}
+    expect_alerts: []

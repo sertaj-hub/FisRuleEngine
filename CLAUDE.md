@@ -7,4 +7,5 @@ Batch AML detection platform (US BSA; cards, loans, deposits). Alerts will feed 
 - Keep application SQL portable ANSI where it costs nothing; vendor SQL goes in `Dialect`. PostgreSQL-only features are fine in migrations.
 - Set-based SQL, never row-by-row in Java (ADR-0001).
 - Batch model: a batch (one business date) succeeds or fails as a whole (ADR-0003, `specs/requirements/batch.md`).
+- Rules are configured templates, not code (ADR-0004): a new rule is a YAML file in `specs/rules/` with test scenarios; `RuleSpecIT` runs them. No per-rule severity.
 - Out of scope: sanctions/watchlist, KYC scoring, real-time detection.

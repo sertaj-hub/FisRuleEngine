@@ -1,0 +1,31 @@
+code: LOAN_EARLY_PAYOFF
+name: Loan paid off shortly after disbursement
+description: A loan is paid off within 90 days of funds being disbursed.
+template: SEQUENCE
+status: ACTIVE
+suppress_days: 0
+config:
+  product_types: [LOAN]
+  within_days: 90
+  first: { txn_types: [LOAN_DISBURSEMENT] }
+  then:  { txn_types: [LOAN_PAYOFF] }
+  first_min_total: 1000
+  then_min_total: 1000
+  then_min_pct_of_first: 50
+tests:
+  - name: payoff 40 days after disbursement
+    business_date: 2026-09-30
+    accounts: [{id: L1, product: LOAN}]
+    txns:
+      - {id: T1, account: L1, type: LOAN_DISBURSEMENT, direction: CREDIT, amount: 20000, date: 2026-08-21}
+      - {id: T2, account: L1, type: LOAN_PAYOFF, direction: CREDIT, amount: 20500, date: 2026-09-30}
+    expect_alerts: [L1]
+  - name: payoff after a year, or a small payment instead of a payoff
+    business_date: 2026-09-30
+    accounts: [{id: L1, product: LOAN}, {id: L2, product: LOAN}]
+    txns:
+      - {id: T1, account: L1, type: LOAN_DISBURSEMENT, direction: CREDIT, amount: 20000, date: 2025-09-01}
+      - {id: T2, account: L1, type: LOAN_PAYOFF, direction: CREDIT, amount: 20500, date: 2026-09-30}
+      - {id: T3, account: L2, type: LOAN_DISBURSEMENT, direction: CREDIT, amount: 20000, date: 2026-09-10}
+      - {id: T4, account: L2, type: LOAN_PAYMENT, direction: CREDIT, amount: 500, date: 2026-09-30}
+    expect_alerts: []

@@ -1,0 +1,34 @@
+code: CREDIT_BALANCE_REFUND
+name: Credit balance refund after payments
+description: >
+  A card account receives payments and then a credit balance refund is paid out (overpay-and-refund typology).
+  Approximated from payments and refunds because balances are not in the data contract yet.
+template: SEQUENCE
+status: ACTIVE
+suppress_days: 30
+config:
+  product_types: [CARD]
+  within_days: 30
+  first: { txn_types: [CARD_PAYMENT], direction: CREDIT }
+  then:  { txn_types: [CREDIT_BALANCE_REFUND] }
+  first_min_total: 1000
+  then_min_total: 1000
+  then_min_pct_of_first: 50
+tests:
+  - name: large payment, refund of most of it two weeks later
+    business_date: 2026-09-30
+    accounts: [{id: A1, product: CARD}]
+    txns:
+      - {id: T1, account: A1, type: CARD_PAYMENT, direction: CREDIT, amount: 5000, date: 2026-09-15}
+      - {id: T2, account: A1, type: CREDIT_BALANCE_REFUND, direction: DEBIT, amount: 4000, date: 2026-09-30}
+    expect_alerts: [A1]
+  - name: refund with no earlier payment, payment too long ago, or refund before the payment
+    business_date: 2026-09-30
+    accounts: [{id: A1, product: CARD}, {id: A2, product: CARD}, {id: A3, product: CARD}]
+    txns:
+      - {id: T1, account: A1, type: CREDIT_BALANCE_REFUND, direction: DEBIT, amount: 4000, date: 2026-09-30}
+      - {id: T2, account: A2, type: CARD_PAYMENT, direction: CREDIT, amount: 5000, date: 2026-08-01}
+      - {id: T3, account: A2, type: CREDIT_BALANCE_REFUND, direction: DEBIT, amount: 4000, date: 2026-09-30}
+      - {id: T4, account: A3, type: CREDIT_BALANCE_REFUND, direction: DEBIT, amount: 4000, date: 2026-09-30, time: "09:00"}
+      - {id: T5, account: A3, type: CARD_PAYMENT, direction: CREDIT, amount: 5000, date: 2026-09-30, time: "15:00"}
+    expect_alerts: []
