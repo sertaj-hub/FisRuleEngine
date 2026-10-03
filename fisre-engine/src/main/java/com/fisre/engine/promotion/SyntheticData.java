@@ -44,17 +44,18 @@ public class SyntheticData {
                     + " SELECT :b, 'ACC' || g, 'CUST' || (1 + g % :customers), (ARRAY['DEPOSIT', 'CARD', 'LOAN'])[1 + g % 3], 'ACTIVE',"
                     + " DATE '2020-01-01' + CAST(g % 1000 AS integer), 'USD' FROM generate_series(1, :accounts) g", p);
         }
-        // Types and directions by account product so the data looks plausible.
+        // Random values are drawn in the select list of the row source so every row gets its own (a lateral sub-select
+        // that does not reference the row would be evaluated once). Types follow the account's product (n % 3 as above).
         jdbc.update("INSERT INTO " + stg + ".txn_b" + seq + " (batch_id, transaction_id, account_id, txn_ts, posting_date, txn_type, direction, amount, currency)"
-                + " SELECT :b, :b || '-' || g, 'ACC' || a.n, CAST(:posting AS timestamp) + (random() * 86399) * INTERVAL '1 second', :posting,"
-                + " t.txn_type, t.direction, ROUND(CAST(5 + random() * random() * 12000 AS numeric), 2), 'USD'"
-                + " FROM generate_series(1, :txns) g"
-                + " CROSS JOIN LATERAL (SELECT 1 + floor(random() * :accounts)::bigint AS n) a"
-                + " CROSS JOIN LATERAL (SELECT CASE a.n % 3"
-                + "   WHEN 0 THEN (ARRAY['CASH_DEPOSIT', 'CASH_WITHDRAWAL', 'ACH_CREDIT', 'ACH_DEBIT', 'WIRE_IN', 'WIRE_OUT'])[1 + floor(random() * 6)::int]"
-                + "   WHEN 1 THEN (ARRAY['POS_PURCHASE', 'ECOM_PURCHASE', 'CARD_PAYMENT', 'CARD_CASH_ADVANCE'])[1 + floor(random() * 4)::int]"
-                + "   ELSE (ARRAY['LOAN_PAYMENT', 'LOAN_PAYMENT', 'LOAN_PAYOFF'])[1 + floor(random() * 3)::int] END AS txn_type,"
-                + "   CASE WHEN random() < 0.5 THEN 'CREDIT' ELSE 'DEBIT' END AS direction) t", p);
+                + " SELECT :b, :b || '-' || v.g, 'ACC' || v.n, CAST(:posting AS timestamp) + v.r4 * 86399 * INTERVAL '1 second', :posting,"
+                + " CASE v.n % 3"
+                + "   WHEN 0 THEN (ARRAY['CASH_DEPOSIT', 'CASH_WITHDRAWAL', 'ACH_CREDIT', 'ACH_DEBIT', 'WIRE_IN', 'WIRE_OUT'])[1 + floor(v.r1 * 6)::int]"
+                + "   WHEN 1 THEN (ARRAY['POS_PURCHASE', 'ECOM_PURCHASE', 'CARD_PAYMENT', 'CARD_CASH_ADVANCE'])[1 + floor(v.r1 * 4)::int]"
+                + "   ELSE (ARRAY['LOAN_PAYMENT', 'LOAN_PAYMENT', 'LOAN_PAYOFF'])[1 + floor(v.r1 * 3)::int] END,"
+                + " CASE WHEN v.r2 < 0.5 THEN 'CREDIT' ELSE 'DEBIT' END,"
+                + " ROUND(CAST(5 + v.r3 * v.r3 * 12000 AS numeric), 2), 'USD'"
+                + " FROM (SELECT g, 1 + floor(random() * :accounts)::bigint AS n, random() AS r1, random() AS r2, random() AS r3, random() AS r4"
+                + " FROM generate_series(1, :txns) g) v", p);
         jdbc.update("UPDATE " + aml + ".load_batch SET status = 'LOADED', loaded_ts = CURRENT_TIMESTAMP WHERE batch_id = :b", p);
         log.info("Generated batch {} (business date {}, posting day {}): {} transactions, {} accounts{}", batchId, businessDate, posting,
                 bench.txns(), bench.accounts(), bench.reference() ? " with customers and accounts" : "");

@@ -105,5 +105,9 @@ class HistoryIT {
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM mst.txn", Long.class)).isEqualTo(props.bench().txns());
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM mst.account", Long.class)).isEqualTo(props.bench().accounts());
         assertThat(jdbc.queryForObject("SELECT COUNT(DISTINCT product_type) FROM mst.account", Long.class)).isEqualTo(3);
+        // Regression: once every row got the same random account and type. Data must be spread and varied.
+        assertThat(jdbc.queryForObject("SELECT COUNT(DISTINCT account_id) FROM mst.txn", Long.class)).isGreaterThan(props.bench().accounts() / 2);
+        assertThat(jdbc.queryForObject("SELECT COUNT(DISTINCT txn_type) FROM mst.txn", Long.class)).isGreaterThanOrEqualTo(10);
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM mst.txn t JOIN mst.ref_txn_type r ON r.txn_type = t.txn_type WHERE r.is_cash = 'Y'", Long.class)).isGreaterThan(0);
     }
 }
