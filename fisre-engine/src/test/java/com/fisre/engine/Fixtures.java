@@ -39,7 +39,7 @@ public class Fixtures {
     public void resetAll() {
         jdbc.execute("DROP TRIGGER IF EXISTS fail_acct ON " + mst + ".account");
         purgeAlerts();
-        for (String t : new String[] {aml + ".alert_rejection_notice", aml + ".alert_delivery", aml + ".rule_run", aml + ".rule", aml + ".nightly_run"}) {
+        for (String t : new String[] {aml + ".ml_score", aml + ".ml_model", aml + ".alert_rejection_notice", aml + ".alert_delivery", aml + ".rule_run", aml + ".rule", aml + ".nightly_run"}) {
             jdbc.update("DELETE FROM " + t);
         }
         for (String p : partitions(mst, "txn")) {
@@ -58,6 +58,18 @@ public class Fixtures {
         for (String t : new String[] {aml + ".load_reject", aml + ".load_batch_entity", aml + ".load_batch"}) {
             jdbc.update("DELETE FROM " + t);
         }
+    }
+
+    /** Registers an ML model row (no artifact; detection only reads scores). */
+    public void mlModel(String name, String version, String status) {
+        jdbc.update("INSERT INTO " + aml + ".ml_model (model_name, model_version, status, train_from, train_to, train_rows, params, artifact_path, artifact_sha256)"
+                + " VALUES (?, ?, ?, DATE '2026-01-01', DATE '2026-06-30', 1000, '{}'::jsonb, '/tmp/none', repeat('0', 64))", name, version, status);
+    }
+
+    public void mlScore(String version, String asOf, String accountId, String product, double score, int rank) {
+        jdbc.update("INSERT INTO " + aml + ".ml_score (model_version, as_of_date, account_id, product_type, score, rank_in_product, explanation)"
+                + " VALUES (?, ?, ?, ?, ?, ?, '[{\"feature\":\"total_1d\",\"value\":9000,\"peer_median\":100,\"z\":12.5}]'::jsonb)",
+                version, Date.valueOf(asOf), accountId, product, score, rank);
     }
 
     /** Handed-off alerts are immutable; tests purge them with the documented bypass, on one connection. */

@@ -3,6 +3,7 @@ package com.fisre.engine.detect;
 import com.fasterxml.jackson.databind.JsonNode;
 import java.time.LocalDate;
 import java.util.Map;
+import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 
 /**
  * A generic, tested detection pattern. Turns a rule's JSON config into set-based SQL (ADR-0004).
@@ -24,4 +25,15 @@ public interface Template {
      * from the placeholder {@code {hits}}, which the caller replaces with the hits query as a subquery named h.
      */
     Built build(JsonNode config, LocalDate businessDate, String mst);
+
+    /** Variant for templates that also read aml tables. Defaults to the master-only build. */
+    default Built build(JsonNode config, LocalDate businessDate, String mst, String aml) {
+        return build(config, businessDate, mst);
+    }
+
+    /**
+     * Data the template depends on that is produced outside detection (e.g. ML scores). Throws IllegalStateException when it
+     * is missing for the as-of day, so the rule fails visibly instead of silently finding nothing (REQ-ML-010).
+     */
+    default void requireInputs(JsonNode config, LocalDate asOf, NamedParameterJdbcTemplate jdbc, String aml) {}
 }

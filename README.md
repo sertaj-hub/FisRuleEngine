@@ -9,7 +9,7 @@ bank ETL ─► stg (customer, account, txn, tagged batch_id) ─[promote batch]
 A **batch** is one business date and succeeds or fails as a whole. The 1 am batch for business date D carries the transactions posted on **D-1** (`FISRE_POSTING_OFFSET_DAYS`, default 1). On success its staging partitions are dropped; on failure
 fix stg and `reopen`, or `clean` and reload under a new batch id. The ETL registers a batch by inserting into `aml.load_batch`, which creates its staging partitions `<table>_b<batch_seq>`; load straight into those for speed. Protocol: [`specs/data-contract/batch-protocol.md`](specs/data-contract/batch-protocol.md).
 
-Status: Phases 0 to 5 done and hardened (foundation, batch promotion, rule framework, nine rules, partitioned scale design, nightly run, reconciled database delivery to case management, safety limits, audit, health checks). Designed for 10M transactions a day and 13 months of history ([ADR-0005](specs/adr/0005-scale-design.md)).
+Status: Phases 0 to 5 done and hardened (foundation, batch promotion, rule framework, nine rules, partitioned scale design, nightly run, reconciled database delivery to case management, safety limits, audit, health checks), plus ML anomaly scoring in shadow mode (`fisre-ml/`, ADR-0009). Designed for 10M transactions a day and 13 months of history ([ADR-0005](specs/adr/0005-scale-design.md)).
 Specs: [`specs/`](specs/README.md). Decisions: [`specs/adr/`](specs/adr).
 
 ## Run
@@ -32,6 +32,10 @@ FISRE_JOB=generate FISRE_BATCH_ID=G1 FISRE_BUSINESS_DATE=2026-10-01 FISRE_BENCH_
 ```
 
 Schema names: `FISRE_SCHEMA_STG|MST|AML`. Exit code is non-zero when a batch fails or any rule fails.
+
+## Machine learning
+
+[`fisre-ml/`](fisre-ml/README.md) trains and scores an unsupervised anomaly model in Python; its scores become `ML_ANOMALY` alerts through the `ML_SCORE` rule template. It ships in shadow mode (rule `DRAFT`): scores are recorded for review, nothing reaches case management until the rule is made `ACTIVE`.
 
 ## Rules
 

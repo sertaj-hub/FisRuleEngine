@@ -139,10 +139,13 @@ All rules are generic *templates* configured with parameters, not product-specif
 | `DORMANT_REACTIVATION` | Deposit | No transactions for 180 days, then $5,000 or more of activity | DORMANT_REACTIVATION | `dormant_days, total, last_activity` |
 | `DEBIT_SPIKE_VS_BASELINE` | Deposit | Debit activity far above the account's own 30-day baseline | BASELINE_DEVIATION | `metric, today, baseline_daily_average, ratio, multiplier, baseline_days, baseline_active_days` |
 | `NEW_COUNTERPARTY_COUNTRY` | Deposit | First transactions to a counterparty country not seen in the baseline period | NEW_ATTRIBUTE | `attribute, new_values[], txn_count, total, baseline_days` |
+| `ML_ANOMALY` | Any | **Not live yet (shadow mode).** Machine-learning anomaly score: the account's behaviour that day is unusual compared with peers of the same product | ML_SCORE | `model, model_version, score, rank, top_features[{feature, value, peer_median, z}], min_score` |
 
 Notes: `out_pct` and `then_pct_of_first` are percentages (80.0 = 80%). In `BASELINE_DEVIATION`, `ratio = today / baseline_daily_average`. The authoritative, current definitions are the YAML files in `specs/rules/` of the engine repository (with test scenarios); request read access if you want the exact parameters.
 
-Samples for every rule: `samples/alert-<rule>.json`. **Use them as contract test fixtures** (section 17).
+`ML_ANOMALY` will only appear in deliveries after Compliance approves going live (an announced change; see ADR-0009 in the engine repository). Its `score` is a percentile from 0 to 1 (0.995 = more unusual than 99.5% of training) and `top_features` is a heuristic explanation of *why to look*, not proof of wrongdoing; it is not a severity. Design for it now: ignore unknown evidence keys (CMR-ING-10) and show `top_features` to the analyst.
+
+Samples for the nine live rules: `samples/alert-<rule>.json`. **Use them as contract test fixtures** (section 17).
 
 ---
 
@@ -377,6 +380,7 @@ A true-positive decision is a **human** decision. The system supports it; it doe
 | Rule | Typical starting category family |
 |---|---|
 | `LARGE_CASH_DAILY`, `STRUCTURING_CASH_DEPOSITS` | Structuring (and, with context, money laundering) |
+| `ML_ANOMALY` | No category suggestion: the analyst determines it from the investigation |
 | `RAPID_MOVEMENT_OF_FUNDS`, `DORMANT_REACTIVATION`, `NEW_COUNTERPARTY_COUNTRY` | Money laundering / suspicious use of accounts |
 | `DEBIT_SPIKE_VS_BASELINE` | Unusual activity; fraud or money laundering depending on investigation |
 | `CARD_CASH_ADVANCE_VELOCITY`, `CREDIT_BALANCE_REFUND` | Credit card related activity; potential fraud or bust-out schemes |

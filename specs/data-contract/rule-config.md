@@ -44,3 +44,7 @@ tests:
       - {id: T1, account: A1, type: CASH_DEPOSIT, direction: CREDIT, amount: 4000, date: 2026-09-30, time: "10:00"}   # optional: counterparty_country
     expect_alerts: [A1]                            # account ids; [] means no alert
 ```
+
+## ML_SCORE
+
+Keys: `model` (name, default `account_anomaly`), `min_score` (0 to 1, required), optional `product_types`. Reads aml.ml_score of the ACTIVE model for the as-of day; fails the rule if there are none. See `ml-scores.md` and ADR-0009.

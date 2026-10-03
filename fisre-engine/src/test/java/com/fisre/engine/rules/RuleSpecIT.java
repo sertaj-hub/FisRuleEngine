@@ -38,7 +38,7 @@ class RuleSpecIT {
     @Autowired DetectionService detection;
 
     @TestFactory
-    @Req({"REQ-RULE-005", "REQ-RULE-006", "REQ-RULE-007", "REQ-RULE-008", "REQ-RULE-009", "REQ-RULE-011", "REQ-RULE-012", "REQ-RULE-013"})
+    @Req({"REQ-RULE-005", "REQ-RULE-006", "REQ-RULE-007", "REQ-RULE-008", "REQ-RULE-009", "REQ-RULE-011", "REQ-RULE-012", "REQ-RULE-013", "REQ-ML-008"})
     Stream<DynamicTest> everyRuleSpecScenarioPasses() throws IOException {
         List<DynamicTest> tests = new ArrayList<>();
         Set<String> templatesUsed = new TreeSet<>();
@@ -83,7 +83,24 @@ class RuleSpecIT {
                     t.get("amount").decimalValue().setScale(2), t.get("date").asText(), t.path("time").asText("12:00"),
                     t.path("counterparty_country").asText(null));
         }
-        loader.load(List.of(spec), spec.sourceFile());
+        // Scenarios test a rule's configuration as if it were live, so a shadow-mode (DRAFT) rule is run as ACTIVE here.
+        RuleSpec live = new RuleSpec(spec.code(), spec.name(), spec.description(), spec.template(), "ACTIVE", spec.suppressDays(), spec.config(), spec.sourceFile());
+        if (sc.has("ml_scores")) {
+            String model = spec.config().path("model").asText("account_anomaly");
+            fx.mlModel(model, "test-v1", "ACTIVE");
+            int rank = 1;
+            for (JsonNode m : sc.get("ml_scores")) {
+                String acct = m.get("account").asText();
+                String product = sc.get("accounts").findValues("product").get(0).asText();
+                for (JsonNode a : sc.get("accounts")) {
+                    if (a.get("id").asText().equals(acct)) {
+                        product = a.get("product").asText();
+                    }
+                }
+                fx.mlScore("test-v1", asOf, acct, product, m.get("score").asDouble(), rank++);
+            }
+        }
+        loader.load(List.of(live), spec.sourceFile());
 
         DetectionService.Result r = detection.detect(businessDate);
 

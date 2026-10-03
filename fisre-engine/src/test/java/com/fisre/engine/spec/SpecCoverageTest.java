@@ -20,8 +20,10 @@ class SpecCoverageTest {
 
     private static final Path SPECS = Path.of("..", "specs", "requirements");
     private static final Path TESTS = Path.of("src", "test", "java");
+    private static final Path ML_TESTS = Path.of("..", "fisre-ml", "tests");
     private static final Pattern IMPLEMENTED_ROW = Pattern.compile("\\|\\s*(REQ-[A-Z]+-\\d+)\\s*\\|.*\\|\\s*Implemented\\s*\\|");
     private static final Pattern ANY_ROW = Pattern.compile("\\|\\s*(REQ-[A-Z]+-\\d+)\\s*\\|");
+    private static final Pattern PY_REQ_REF = Pattern.compile("#\\s*(REQ-[A-Z]+-\\d+)");   // fisre-ml tests mark them as "# REQ-ML-001"
     private static final Pattern REQ_REF = Pattern.compile("\"(REQ-[A-Z]+-\\d+)\"");
 
     @Test
@@ -29,6 +31,7 @@ class SpecCoverageTest {
         Set<String> implemented = matches(SPECS, "md", IMPLEMENTED_ROW);
         Set<String> declared = matches(SPECS, "md", ANY_ROW);
         Set<String> referenced = matches(TESTS, "java", REQ_REF);
+        referenced.addAll(matches(ML_TESTS, "py", PY_REQ_REF));
 
         assertThat(implemented).as("implemented requirements found in specs").isNotEmpty();
 
