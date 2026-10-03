@@ -1,0 +1,35 @@
+name: ci
+on:
+  push:
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        db: [postgresql, mysql, oracle]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: 21, cache: maven }
+      - name: Start database (${{ matrix.db }})
+        run: |
+          case "${{ matrix.db }}" in
+            postgresql) docker run -d --name db -e POSTGRES_USER=fisre -e POSTGRES_PASSWORD=fisre -e POSTGRES_DB=fisre -p 5432:5432 postgres:16
+                        until docker exec db pg_isready -U fisre; do sleep 2; done
+                        docker exec -i db psql -U fisre -d fisre < ops/db/postgresql/compose-init.sql
+                        echo "FISRE_DB_URL=jdbc:postgresql://localhost:5432/fisre" >> $GITHUB_ENV ;;
+            mysql)      docker run -d --name db -e MYSQL_ROOT_PASSWORD=root -p 3306:3306 mysql:8.4
+                        until docker exec db mysqladmin -uroot -proot ping --silent; do sleep 3; done
+                        docker exec -i db mysql -uroot -proot < ops/db/mysql/init.sql
+                        echo "FISRE_DB_URL=jdbc:mysql://localhost:3306/aml" >> $GITHUB_ENV ;;
+            oracle)     docker run -d --name db -e ORACLE_PASSWORD=oracle -p 1521:1521 gvenzl/oracle-free:23-slim
+                        until docker logs db 2>&1 | grep -q "DATABASE IS READY TO USE"; do sleep 5; done
+                        docker exec -i db sqlplus -s sys/oracle@//localhost:1521/FREEPDB1 as sysdba < ops/db/oracle/init.sql
+                        echo "FISRE_DB_URL=jdbc:oracle:thin:@//localhost:1521/FREEPDB1" >> $GITHUB_ENV ;;
+          esac
+          echo "FISRE_DB_VENDOR=${{ matrix.db }}" >> $GITHUB_ENV
+      - name: Build, unit tests, spec gate, integration tests
+        run: mvn -B verify

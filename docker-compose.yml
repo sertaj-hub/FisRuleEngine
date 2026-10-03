@@ -1,0 +1,17 @@
+# Local databases for development. Start one (or all) and point FISRE_DB_* at it.
+services:
+  postgres:
+    image: postgres:16
+    environment: { POSTGRES_USER: fisre, POSTGRES_PASSWORD: fisre, POSTGRES_DB: fisre }
+    ports: ["5432:5432"]
+    volumes: ["./ops/db/postgresql/compose-init.sql:/docker-entrypoint-initdb.d/init.sql:ro"]
+  mysql:
+    image: mysql:8.4
+    environment: { MYSQL_ROOT_PASSWORD: root }
+    ports: ["3306:3306"]
+    volumes: ["./ops/db/mysql/init.sql:/docker-entrypoint-initdb.d/init.sql:ro"]
+  oracle:
+    image: gvenzl/oracle-free:23-slim
+    environment: { ORACLE_PASSWORD: oracle }
+    ports: ["1521:1521"]
+    volumes: ["./ops/db/oracle/init.sql:/container-entrypoint-initdb.d/init.sql:ro"]

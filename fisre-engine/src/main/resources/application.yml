@@ -1,0 +1,23 @@
+# One artifact, any supported database: choose with FISRE_DB_VENDOR + FISRE_DB_URL.
+fisre:
+  db-vendor: ${FISRE_DB_VENDOR:postgresql}   # postgresql | mysql | oracle
+  job: ${FISRE_JOB:none}                     # none | promote
+  schemas:                                   # logical schema -> physical schema/database/user
+    stg: ${FISRE_SCHEMA_STG:stg}
+    mst: ${FISRE_SCHEMA_MST:mst}
+    aml: ${FISRE_SCHEMA_AML:aml}
+
+spring:
+  main:
+    web-application-type: none
+  datasource:
+    url: ${FISRE_DB_URL:jdbc:postgresql://localhost:5432/fisre}
+    username: ${FISRE_DB_USER:fisre}
+    password: ${FISRE_DB_PASSWORD:fisre}
+  flyway:
+    locations: classpath:db/migration/common,classpath:db/migration/${fisre.db-vendor}
+    default-schema: ${fisre.schemas.aml}
+    placeholders:
+      stg: ${fisre.schemas.stg}
+      mst: ${fisre.schemas.mst}
+      aml: ${fisre.schemas.aml}
