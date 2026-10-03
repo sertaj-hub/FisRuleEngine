@@ -29,6 +29,7 @@ Re-running `nightly` for the same batch after a later step failed is safe: promo
 
 ## One-off jobs
 
+- Confirmation received outside the database: `FISRE_JOB=confirm-delivery FISRE_DELIVERY_ID=.. FISRE_RECEIVED_COUNT=.. FISRE_RECEIVED_CHECKSUM=.. FISRE_CONFIRM_REFERENCE=<ticket or message id>` for one delivery, or `FISRE_JOB=import-confirmations FISRE_CONFIRM_FILE=<csv>` (`delivery_id,received_count,received_checksum[,reference]`). Same comparison as the database function; the reference is mandatory and recorded.
 - Load or change rules: edit `specs/rules/*.yml`, then `FISRE_JOB=load-rules FISRE_RULES_DIR=<dir>`. Unchanged rules get no new version.
 - Initial history (one month, later up to 13): ETL loads one batch per day (earliest carries the full customer and account snapshot); then `FISRE_JOB=promote-loaded` (earliest first, rest in parallel, `FISRE_PARALLELISM`). Do not run detect for history.
 - Retention: part of `nightly`; or `FISRE_JOB=retain FISRE_BUSINESS_DATE=D` (keeps 13 months, `FISRE_RETENTION_MONTHS`).

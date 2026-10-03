@@ -26,7 +26,7 @@ class JobRunnerTest {
     private static JobRunner runner(FisreProperties props, com.fisre.engine.detect.DetectionService detection, NightlyService nightly, HealthService health) {
         return new JobRunner(props, mock(BatchService.class), mock(com.fisre.engine.rules.RuleLoader.class), detection,
                 mock(com.fisre.engine.promotion.RetentionService.class), mock(com.fisre.engine.promotion.SyntheticData.class), nightly,
-                mock(JobLock.class), health);
+                mock(JobLock.class), health, mock(com.fisre.engine.detect.DeliveryService.class));
     }
 
     @Test
@@ -81,5 +81,13 @@ class JobRunnerTest {
                 new HealthService.Finding("WARN", "ALERT_BACKLOG", "3 alerts waiting"),
                 new HealthService.Finding("CRITICAL", "STUCK_BATCH", "stuck")));
         assertThatThrownBy(() -> runner(props, detection, mock(NightlyService.class), health).run(null)).hasMessageContaining("1 critical problem");
+    }
+
+    @Test
+    @Req({"REQ-DLV-011", "REQ-DLV-012"})
+    void outOfBandConfirmationJobsNeedTheirInputs_andFailWhenTheNumbersDoNotReconcile() {
+        var detection = mock(com.fisre.engine.detect.DetectionService.class);
+        assertThatThrownBy(() -> runner(Fixtures.props("confirm-delivery", "", ""), detection).run(null)).hasMessageContaining("FISRE_DELIVERY_ID");
+        assertThatThrownBy(() -> runner(Fixtures.props("import-confirmations", "", ""), detection).run(null)).hasMessageContaining("FISRE_CONFIRM_FILE");
     }
 }

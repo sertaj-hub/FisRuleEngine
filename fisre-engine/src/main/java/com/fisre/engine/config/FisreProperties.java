@@ -5,7 +5,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 
 @ConfigurationProperties(prefix = "fisre")
 public record FisreProperties(String dbVendor, String job, String batchId, String businessDate, String rulesDir,
-                              Schemas schemas, Tuning tuning, Bench bench) {
+                              Schemas schemas, Tuning tuning, Bench bench, Confirm confirm) {
 
     /** Physical names of the three logical schemas. They become SQL identifiers, so they are validated here (REQ-SEC-002). */
     public record Schemas(String stg, String mst, String aml) {
@@ -33,6 +33,13 @@ public record FisreProperties(String dbVendor, String job, String batchId, Strin
                          int volumeHighPercent, int healthStuckMinutes, int healthAckHours, int healthConfirmHours) {
         public static Tuning defaults() {
             return new Tuning(1, 3, 13, 200, 4, 2, 100, false, 1800, 7, 3, 50, 200, 120, 24, 12);
+        }
+    }
+
+    /** Numbers received out of band for the confirm-delivery and import-confirmations jobs (REQ-DLV-011, REQ-DLV-012). */
+    public record Confirm(Long deliveryId, Integer receivedCount, String receivedChecksum, String reference, String file) {
+        public static Confirm defaults() {
+            return new Confirm(null, null, null, null, null);
         }
     }
 

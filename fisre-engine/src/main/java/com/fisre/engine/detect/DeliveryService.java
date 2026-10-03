@@ -1,7 +1,12 @@
 package com.fisre.engine.detect;
 
 import com.fisre.engine.config.FisreProperties;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import org.slf4j.Logger;
@@ -68,6 +73,9 @@ public class DeliveryService {
                     + ".alert WHERE delivery_id = :id GROUP BY rule_code) x),"
                     + " checksum = " + aml + ".compute_alert_checksum(ARRAY(SELECT alert_id FROM " + aml + ".alert WHERE delivery_id = :id))"
                     + " WHERE delivery_id = :id AND status = 'OPEN'", Map.of("id", deliveryId, "n", count));
+            // Only a hint for consumers that LISTEN; delivered when this transaction commits. Polling is always enough.
+            jdbc.queryForObject("SELECT pg_notify('aml_delivery_ready', json_build_object('delivery_id', d.delivery_id, 'business_date', d.business_date,"
+                    + " 'revision', d.revision, 'alert_count', d.alert_count)::text)::text FROM " + aml + ".alert_delivery d WHERE d.delivery_id = :id", p, String.class);
             log.info("Delivery {} (revision {}) published with {} alert(s)", deliveryId, revision, count);
             return Optional.of(new Published(deliveryId, revision, count));
         });
@@ -79,5 +87,65 @@ public class DeliveryService {
                 + " FROM " + aml + ".alert_delivery WHERE business_date = :d ORDER BY revision DESC",
                 Map.of("d", java.sql.Date.valueOf(date)), String.class);
         return rows.stream().findFirst();
+    }
+
+    /** Result of one out-of-band confirmation. */
+    public record ConfirmationResult(String line, String outcome, String message) {
+        public boolean ok() {
+            return "CONFIRMED".equals(outcome);
+        }
+    }
+
+    /**
+     * Applies numbers received outside the database (a message, a ticket, a file) with the same comparison as
+     * aml.confirm_delivery, and records the channel and a reference for the audit trail (REQ-DLV-011).
+     */
+    public String confirmOutOfBand(long deliveryId, int receivedCount, String receivedChecksum, String channel, String reference) {
+        if (reference == null || reference.isBlank()) {
+            throw new IllegalArgumentException("A reference (ticket, e-mail or message id) is required for an out-of-band confirmation");
+        }
+        return tx.execute(s -> {
+            Map<String, Object> p = Map.of("id", deliveryId);
+            String before = jdbc.queryForList("SELECT status FROM " + aml + ".alert_delivery WHERE delivery_id = :id", p, String.class).stream().findFirst().orElse(null);
+            String result = jdbc.queryForObject("SELECT " + aml + ".confirm_delivery(:id, :c, :s)", Map.of("id", deliveryId, "c", receivedCount, "s", receivedChecksum), String.class);
+            if ("CONFIRMED".equals(result) && !"CONFIRMED".equals(before)) {
+                jdbc.update("UPDATE " + aml + ".alert_delivery SET confirmation_channel = :ch, confirmation_reference = :ref WHERE delivery_id = :id",
+                        Map.of("id", deliveryId, "ch", channel, "ref", reference.substring(0, Math.min(reference.length(), 200))));
+            }
+            log.info("Delivery {} out-of-band confirmation via {} ({}): {}", deliveryId, channel, reference, result);
+            return result;
+        });
+    }
+
+    /**
+     * Reads a CSV of confirmations: delivery_id,received_count,received_checksum[,reference]; an optional header line
+     * and blank lines are ignored. Every line is attempted; one bad line does not stop the others (REQ-DLV-012).
+     */
+    public List<ConfirmationResult> importConfirmations(Path file) {
+        List<String> lines;
+        try {
+            lines = Files.readAllLines(file);
+        } catch (IOException e) {
+            throw new IllegalArgumentException("Cannot read confirmation file " + file + ": " + e.getMessage(), e);
+        }
+        List<ConfirmationResult> out = new ArrayList<>();
+        for (String raw : lines) {
+            String line = raw.trim();
+            if (line.isEmpty() || line.toLowerCase().startsWith("delivery_id")) {
+                continue;
+            }
+            try {
+                String[] f = line.split(",", -1);
+                if (f.length < 3) {
+                    throw new IllegalArgumentException("expected delivery_id,received_count,received_checksum[,reference]");
+                }
+                String reference = f.length > 3 && !f[3].isBlank() ? f[3].trim() : file.getFileName().toString();
+                String result = confirmOutOfBand(Long.parseLong(f[0].trim()), Integer.parseInt(f[1].trim()), f[2].trim(), "FILE", reference);
+                out.add(new ConfirmationResult(line, result, null));
+            } catch (RuntimeException e) {
+                out.add(new ConfirmationResult(line, "ERROR", e.getMessage()));
+            }
+        }
+        return out;
     }
 }

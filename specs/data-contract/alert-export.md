@@ -40,6 +40,13 @@ A re-run for a date that already has a published delivery never changes it. New 
 - **`aml.compute_alert_checksum(alert_ids bigint[]) returns text`**: the checksum formula, so both sides agree. It is the SHA-256, lowercase hex, of the alert ids sorted ascending and joined with commas (no spaces; an empty list gives the SHA-256 of the empty string).
 - `aml.ack_alerts(alert_ids bigint[]) returns integer` (optional): mark individual alerts handed off while you ingest. `confirm_delivery` makes it unnecessary.
 
+## Availability signals and out-of-band confirmation
+
+- **Poll** `aml.v_alert_delivery` (always sufficient). Optionally `LISTEN aml_delivery_ready`: the engine sends `{"delivery_id", "business_date", "revision", "alert_count"}` when a delivery is published (a hint, lost if the listener is disconnected).
+- A consumer that cannot call functions can have a delivery confirmed out of band: the `confirm-delivery` job (one delivery, operator, reference required) or `import-confirmations` (CSV file). Same comparison; recorded in `v_alert_reconciliation` as `confirmation_channel` (`DB`, `OPERATOR`, `FILE`) and `confirmation_reference`.
+
+Functional description of the whole intake and reconciliation: `docs/case-management-alert-intake.md`.
+
 ## Intake loop
 
 1. `SELECT delivery_id, alert_count, checksum FROM aml.v_alert_delivery WHERE status IN ('READY','MISMATCH') ORDER BY business_date, revision`.

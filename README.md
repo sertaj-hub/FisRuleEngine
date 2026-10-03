@@ -49,7 +49,7 @@ scenarios, which the build runs against the database. Reference: [`specs/data-co
 
 ## Case management
 
-Case management reads alerts from the database. Each business date is one **delivery**, published when detection finishes, with control totals (count, per-rule counts, checksum). The consumer ingests it from `aml.v_alert_export` (one self-contained JSON payload per alert) and reconciles with `aml.confirm_delivery(id, count, checksum)`; it can `aml.reject_alerts(...)` and read `WITHDRAWN` events. Contract: [`specs/data-contract/alert-export.md`](specs/data-contract/alert-export.md), ADR-0008. Day-to-day operation and failure handling: [`ops/RUNBOOK.md`](ops/RUNBOOK.md).
+Case management reads alerts from the database. Each business date is one **delivery**, published when detection finishes, with control totals (count, per-rule counts, checksum). The consumer ingests it from `aml.v_alert_export` (one self-contained JSON payload per alert) and reconciles with `aml.confirm_delivery(id, count, checksum)`; it can `aml.reject_alerts(...)` and read `WITHDRAWN` events. Contract: [`specs/data-contract/alert-export.md`](specs/data-contract/alert-export.md), ADR-0008. **Functional design for the case management side: [`docs/case-management-alert-intake.md`](docs/case-management-alert-intake.md).** Day-to-day operation and failure handling: [`ops/RUNBOOK.md`](ops/RUNBOOK.md).
 
 ## Test
 

@@ -1,6 +1,7 @@
 package com.fisre.engine.run;
 
 import com.fisre.engine.config.FisreProperties;
+import com.fisre.engine.detect.DeliveryService;
 import com.fisre.engine.detect.DetectionService;
 import com.fisre.engine.promotion.BatchService;
 import com.fisre.engine.promotion.RetentionService;
@@ -31,9 +32,10 @@ public class JobRunner implements ApplicationRunner {
     private final NightlyService nightly;
     private final JobLock lock;
     private final HealthService health;
+    private final DeliveryService deliveries;
 
     public JobRunner(FisreProperties props, BatchService batches, RuleLoader rules, DetectionService detection,
-                     RetentionService retention, SyntheticData synthetic, NightlyService nightly, JobLock lock, HealthService health) {
+                     RetentionService retention, SyntheticData synthetic, NightlyService nightly, JobLock lock, HealthService health, DeliveryService deliveries) {
         this.props = props;
         this.batches = batches;
         this.rules = rules;
@@ -43,6 +45,7 @@ public class JobRunner implements ApplicationRunner {
         this.nightly = nightly;
         this.lock = lock;
         this.health = health;
+        this.deliveries = deliveries;
     }
 
     @Override
@@ -88,6 +91,30 @@ public class JobRunner implements ApplicationRunner {
             }
             return;
         }
+        if (job.equals("confirm-delivery")) {
+            var c = props.confirm();
+            if (c.deliveryId() == null || c.receivedCount() == null || c.receivedChecksum() == null || c.receivedChecksum().isBlank()) {
+                throw new IllegalArgumentException("fisre.job=confirm-delivery needs FISRE_DELIVERY_ID, FISRE_RECEIVED_COUNT, FISRE_RECEIVED_CHECKSUM and FISRE_CONFIRM_REFERENCE");
+            }
+            String result = deliveries.confirmOutOfBand(c.deliveryId(), c.receivedCount(), c.receivedChecksum(), "OPERATOR", c.reference());
+            if (!"CONFIRMED".equals(result)) {
+                throw new IllegalStateException("Delivery " + c.deliveryId() + " did not reconcile: " + result + "; see aml.v_alert_reconciliation");
+            }
+            return;
+        }
+        if (job.equals("import-confirmations")) {
+            String file = props.confirm().file();
+            if (file == null || file.isBlank()) {
+                throw new IllegalArgumentException("fisre.job=import-confirmations needs FISRE_CONFIRM_FILE");
+            }
+            var results = deliveries.importConfirmations(java.nio.file.Path.of(file));
+            results.forEach(r -> log.info("Confirmation line '{}': {}{}", r.line(), r.outcome(), r.message() == null ? "" : " (" + r.message() + ")"));
+            long bad = results.stream().filter(r -> !r.ok()).count();
+            if (results.isEmpty() || bad > 0) {
+                throw new IllegalStateException(results.isEmpty() ? "No confirmations found in " + file : bad + " of " + results.size() + " confirmation(s) did not reconcile");
+            }
+            return;
+        }
         if (job.equals("nightly")) {
             if (props.batchId() == null || props.batchId().isBlank() || props.businessDate() == null || props.businessDate().isBlank()) {
                 throw new IllegalArgumentException("fisre.job=nightly needs fisre.batch-id (FISRE_BATCH_ID) and fisre.business-date (FISRE_BUSINESS_DATE)");
@@ -123,7 +150,7 @@ public class JobRunner implements ApplicationRunner {
         }
         String batchId = props.batchId();
         if (!java.util.Set.of("promote", "clean", "reopen").contains(job)) {
-            throw new IllegalArgumentException("Unknown fisre.job '" + job + "' (expected none, health, promote, promote-loaded, clean, reopen, load-rules, detect, retain, generate or nightly)");
+            throw new IllegalArgumentException("Unknown fisre.job '" + job + "' (expected none, health, promote, promote-loaded, clean, reopen, load-rules, detect, retain, generate, nightly, confirm-delivery or import-confirmations)");
         }
         if (batchId == null || batchId.isBlank()) {
             throw new IllegalArgumentException("fisre.job=" + job + " needs fisre.batch-id (FISRE_BATCH_ID)");

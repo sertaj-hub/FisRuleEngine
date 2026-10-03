@@ -23,7 +23,7 @@ public class Fixtures {
 
     public static FisreProperties props(String job, String batchId, String businessDate) {
         return new FisreProperties("postgresql", job, batchId, businessDate, "specs/rules",
-                new FisreProperties.Schemas("stg", "mst", "aml"), FisreProperties.Tuning.defaults(), FisreProperties.Bench.defaults());
+                new FisreProperties.Schemas("stg", "mst", "aml"), FisreProperties.Tuning.defaults(), FisreProperties.Bench.defaults(), FisreProperties.Confirm.defaults());
     }
 
     /** Names of the partitions of a partitioned table. */

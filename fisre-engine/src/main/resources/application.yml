@@ -1,7 +1,7 @@
 # PostgreSQL is the only vendor built and tested for now (ADR-0002); the Dialect seam keeps others possible.
 fisre:
   db-vendor: ${FISRE_DB_VENDOR:postgresql}
-  job: ${FISRE_JOB:none}                     # none | promote | promote-loaded | clean | reopen | load-rules | detect | retain | generate | nightly | health
+  job: ${FISRE_JOB:none}                     # none | promote | promote-loaded | clean | reopen | load-rules | detect | retain | generate | nightly | health | confirm-delivery | import-confirmations
   batch-id: ${FISRE_BATCH_ID:}               # required by promote, clean, reopen
   business-date: ${FISRE_BUSINESS_DATE:}     # YYYY-MM-DD, required by detect, retain, generate
   rules-dir: ${FISRE_RULES_DIR:specs/rules}  # rule specs read by load-rules
@@ -26,6 +26,12 @@ fisre:
     health-stuck-minutes: ${FISRE_HEALTH_STUCK_MINUTES:120}
     health-ack-hours: ${FISRE_HEALTH_ACK_HOURS:24}
     health-confirm-hours: ${FISRE_HEALTH_CONFIRM_HOURS:12}   # a published delivery unconfirmed this long is critical
+  confirm:                                                   # out-of-band confirmation (confirm-delivery, import-confirmations)
+    delivery-id: ${FISRE_DELIVERY_ID:}
+    received-count: ${FISRE_RECEIVED_COUNT:}
+    received-checksum: ${FISRE_RECEIVED_CHECKSUM:}
+    reference: ${FISRE_CONFIRM_REFERENCE:}                   # ticket, e-mail or message id; required
+    file: ${FISRE_CONFIRM_FILE:}
   bench:
     txns: ${FISRE_BENCH_TXNS:1000}
     accounts: ${FISRE_BENCH_ACCOUNTS:100}
