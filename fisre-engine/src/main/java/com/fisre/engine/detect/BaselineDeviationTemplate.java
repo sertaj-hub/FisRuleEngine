@@ -18,6 +18,18 @@ public class BaselineDeviationTemplate extends TemplateSupport {
     @Override public String code() { return "BASELINE_DEVIATION"; }
 
     @Override
+    public java.util.List<Field> fields() {
+        return java.util.List.of(
+                Field.of("baseline_days", "Baseline (days)", "INT", true, "The account's own history used as normal"),
+                Field.of("filter", "Matching transactions", "FILTER", false, "Which transactions are measured"),
+                new Field("metric", "Measure", "ENUM", true, "SUM of amounts or COUNT of transactions", java.util.List.of("SUM", "COUNT")),
+                Field.of("multiplier", "Times the daily average", "DECIMAL", true, "Alert when the day is at least this many times normal"),
+                Field.of("min_value", "Minimum value today", "DECIMAL", false, "Ignore small amounts. Default 0"),
+                Field.of("min_active_days", "Minimum active days in baseline", "INT", false, "Needs enough history. Default 1"),
+                Field.of("product_types", "Products", "PRODUCTS", false, "Limit the rule to these products; empty means all"));
+    }
+
+    @Override
     protected Set<String> allowedKeys() {
         return Set.of("baseline_days", "filter", "metric", "multiplier", "min_value", "min_active_days");
     }

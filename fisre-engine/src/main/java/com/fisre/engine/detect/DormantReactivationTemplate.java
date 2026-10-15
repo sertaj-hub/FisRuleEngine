@@ -13,6 +13,15 @@ public class DormantReactivationTemplate extends TemplateSupport {
 
     @Override public String code() { return "DORMANT_REACTIVATION"; }
 
+    @Override
+    public java.util.List<Field> fields() {
+        return java.util.List.of(
+                Field.of("dormant_days", "Dormant for (days)", "INT", true, "No transactions for this long"),
+                Field.of("filter", "Matching transactions", "FILTER", false, "Which activity counts as reactivation"),
+                Field.of("min_total", "Minimum total today", "DECIMAL", true, "Activity on the day must reach this"),
+                Field.of("product_types", "Products", "PRODUCTS", false, "Limit the rule to these products; empty means all"));
+    }
+
     @Override protected Set<String> allowedKeys() { return Set.of("dormant_days", "filter", "min_total"); }
 
     @Override

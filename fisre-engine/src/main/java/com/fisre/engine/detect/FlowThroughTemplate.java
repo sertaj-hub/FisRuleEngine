@@ -13,6 +13,17 @@ public class FlowThroughTemplate extends TemplateSupport {
 
     @Override public String code() { return "FLOW_THROUGH"; }
 
+    @Override
+    public java.util.List<Field> fields() {
+        return java.util.List.of(
+                Field.of("window_days", "Window (days)", "INT", true, "Look back this many days"),
+                Field.of("in", "Money in", "FILTER", true, "Transactions counted as money coming in"),
+                Field.of("out", "Money out", "FILTER", true, "Transactions counted as money going out"),
+                Field.of("min_in", "Minimum amount in", "DECIMAL", true, "Total in must reach this"),
+                Field.of("min_out_pct", "Minimum percent moved out", "DECIMAL", true, "Out as a percentage of in, e.g. 80"),
+                Field.of("product_types", "Products", "PRODUCTS", false, "Limit the rule to these products; empty means all"));
+    }
+
     @Override protected Set<String> allowedKeys() { return Set.of("window_days", "in", "out", "min_in", "min_out_pct"); }
 
     @Override

@@ -1,0 +1,27 @@
+code: ML_ANOMALY
+name: Account behaviour unusual compared with its peers
+description: >
+  Machine-learning anomaly score (Isolation Forest per product, ADR-0009) at or above 0.995 for the day. Ships in shadow mode (DRAFT):
+  scores are recorded and reviewable, no alert reaches case management until this file is changed to ACTIVE.
+template: ML_SCORE
+status: DRAFT
+suppress_days: 7
+config:
+  model: account_anomaly
+  min_score: 0.995
+tests:
+  - name: a very unusual account is raised, with its day's transactions
+    as_of: 2026-09-30
+    accounts: [{id: A1, product: DEPOSIT}, {id: A2, product: DEPOSIT}]
+    txns:
+      - {id: T1, account: A1, type: WIRE_IN, direction: CREDIT, amount: 9000, date: 2026-09-30}
+      - {id: T2, account: A2, type: ACH_CREDIT, direction: CREDIT, amount: 50, date: 2026-09-30}
+    ml_scores: [{account: A1, score: 0.999}, {account: A2, score: 0.40}]
+    expect_alerts: [A1]
+  - name: scores below the threshold raise nothing
+    as_of: 2026-09-30
+    accounts: [{id: A1, product: DEPOSIT}]
+    txns:
+      - {id: T1, account: A1, type: WIRE_IN, direction: CREDIT, amount: 9000, date: 2026-09-30}
+    ml_scores: [{account: A1, score: 0.97}]
+    expect_alerts: []

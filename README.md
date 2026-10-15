@@ -9,7 +9,7 @@ bank ETL ─► stg (customer, account, txn, tagged batch_id) ─[promote batch]
 A **batch** is one business date and succeeds or fails as a whole. The 1 am batch for business date D carries the transactions posted on **D-1** (`FISRE_POSTING_OFFSET_DAYS`, default 1). On success its staging partitions are dropped; on failure
 fix stg and `reopen`, or `clean` and reload under a new batch id. The ETL registers a batch by inserting into `aml.load_batch`, which creates its staging partitions `<table>_b<batch_seq>`; load straight into those for speed. Protocol: [`specs/data-contract/batch-protocol.md`](specs/data-contract/batch-protocol.md).
 
-Status: Phases 0 to 5 done and hardened (foundation, batch promotion, rule framework, nine rules, partitioned scale design, nightly run, reconciled database delivery to case management, safety limits, audit, health checks). Designed for 10M transactions a day and 13 months of history ([ADR-0005](specs/adr/0005-scale-design.md)).
+Status: Phases 0 to 5 done and hardened (foundation, batch promotion, rule framework, nine rules, partitioned scale design, nightly run, reconciled database delivery to case management, safety limits, audit, health checks), plus ML anomaly scoring in shadow mode (`fisre-ml/`, ADR-0009). Designed for 10M transactions a day and 13 months of history ([ADR-0005](specs/adr/0005-scale-design.md)).
 Specs: [`specs/`](specs/README.md). Decisions: [`specs/adr/`](specs/adr).
 
 ## Run
@@ -32,6 +32,25 @@ FISRE_JOB=generate FISRE_BATCH_ID=G1 FISRE_BUSINESS_DATE=2026-10-01 FISRE_BENCH_
 ```
 
 Schema names: `FISRE_SCHEMA_STG|MST|AML`. Exit code is non-zero when a batch fails or any rule fails.
+
+## Machine learning
+
+[`fisre-ml/`](fisre-ml/README.md) trains and scores an unsupervised anomaly model in Python; its scores become `ML_ANOMALY` alerts through the `ML_SCORE` rule template. It ships in shadow mode (rule `DRAFT`): scores are recorded for review, nothing reaches case management until the rule is made `ACTIVE`.
+
+## Rule configuration UI
+
+Compliance staff change rules in a browser instead of editing YAML (ADR-0010, [`specs/requirements/rule-ui.md`](specs/requirements/rule-ui.md)).
+Every change is a new version that goes **draft, dry-run, submit, approve by a different person**; each step is in an append-only audit trail.
+
+```bash
+# create users (min. 12 character password; roles VIEWER, AUTHOR, APPROVER, comma separated)
+FISRE_JOB=create-user FISRE_USER=alice FISRE_PASSWORD='...' FISRE_ROLES=AUTHOR java -jar $JAR
+FISRE_JOB=create-user FISRE_USER=bob   FISRE_PASSWORD='...' FISRE_ROLES=APPROVER java -jar $JAR
+FISRE_JOB=serve java -jar $JAR                  # http://127.0.0.1:8080 (FISRE_WEB_BIND, FISRE_WEB_PORT). Put TLS in front before exposing it.
+FISRE_JOB=export-rules FISRE_EXPORT_DIR=specs/rules java -jar $JAR   # database rules back to YAML (keeps each file's tests:), then commit to git
+```
+
+The database is the source of truth for rule versions. `load-rules` will not overwrite a rule whose latest version was made in the UI. Scenarios stay in `specs/rules/*.yml` and keep running in the build.
 
 ## Rules
 

@@ -20,6 +20,14 @@ jobs:
         run: PGPASSWORD=fisre psql -h localhost -U fisre -d fisre -f ops/db/postgresql/compose-init.sql
       - name: Build, unit tests, spec gate, integration tests
         run: mvn -B verify
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.11" }
+      - name: ML module tests (the Java build above migrated the schema)
+        working-directory: fisre-ml
+        run: |
+          pip install -e '.[test]'
+          python -m pytest -q
+        env: { FISRE_DB_URL: "jdbc:postgresql://localhost:5432/fisre", FISRE_DB_USER: fisre, FISRE_DB_PASSWORD: fisre, FISRE_ALLOW_DEFAULT_CREDENTIALS: "true" }
 
   # Known-vulnerable dependencies (ADR-0007). Needs a free NVD API key in the repository secret NVD_API_KEY, or it is slow.
   dependency-check:

@@ -15,6 +15,18 @@ public class SequenceTemplate extends TemplateSupport {
     @Override public String code() { return "SEQUENCE"; }
 
     @Override
+    public java.util.List<Field> fields() {
+        return java.util.List.of(
+                Field.of("within_days", "Within (days)", "INT", true, "The second step must follow the first within this many days"),
+                Field.of("first", "First step", "FILTER", true, "e.g. payments or disbursement"),
+                Field.of("then", "Then", "FILTER", true, "e.g. refund or payoff"),
+                Field.of("first_min_total", "First step minimum total", "DECIMAL", false, "Default 0"),
+                Field.of("then_min_total", "Second step minimum total", "DECIMAL", false, "Default 0"),
+                Field.of("then_min_pct_of_first", "Second step as percent of first", "DECIMAL", false, "Default 0"),
+                Field.of("product_types", "Products", "PRODUCTS", false, "Limit the rule to these products; empty means all"));
+    }
+
+    @Override
     protected Set<String> allowedKeys() {
         return Set.of("first", "then", "within_days", "first_min_total", "then_min_total", "then_min_pct_of_first");
     }

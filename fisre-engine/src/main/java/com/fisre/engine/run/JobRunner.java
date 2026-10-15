@@ -6,7 +6,10 @@ import com.fisre.engine.detect.DetectionService;
 import com.fisre.engine.promotion.BatchService;
 import com.fisre.engine.promotion.RetentionService;
 import com.fisre.engine.promotion.SyntheticData;
+import com.fisre.engine.rules.RuleExporter;
 import com.fisre.engine.rules.RuleLoader;
+import com.fisre.engine.web.RuleUserService;
+import org.springframework.core.env.Environment;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.ApplicationArguments;
@@ -33,9 +36,13 @@ public class JobRunner implements ApplicationRunner {
     private final JobLock lock;
     private final HealthService health;
     private final DeliveryService deliveries;
+    private final RuleExporter exporter;
+    private final RuleUserService users;
+    private final Environment env;
 
     public JobRunner(FisreProperties props, BatchService batches, RuleLoader rules, DetectionService detection,
-                     RetentionService retention, SyntheticData synthetic, NightlyService nightly, JobLock lock, HealthService health, DeliveryService deliveries) {
+                     RetentionService retention, SyntheticData synthetic, NightlyService nightly, JobLock lock, HealthService health, DeliveryService deliveries,
+                     RuleExporter exporter, RuleUserService users, Environment env) {
         this.props = props;
         this.batches = batches;
         this.rules = rules;
@@ -46,6 +53,9 @@ public class JobRunner implements ApplicationRunner {
         this.lock = lock;
         this.health = health;
         this.deliveries = deliveries;
+        this.exporter = exporter;
+        this.users = users;
+        this.env = env;
     }
 
     @Override
@@ -53,6 +63,21 @@ public class JobRunner implements ApplicationRunner {
         String job = props.job();
         if (job.equals("none")) {
             log.info("No job requested (fisre.job=none); schema migration only.");
+            return;
+        }
+        if (job.equals("serve")) {
+            // the rule UI: the embedded web server (started because FISRE_JOB=serve) keeps the process alive (ADR-0010)
+            log.info("Rule UI is serving on {}:{}; stop the process to end it.", env.getProperty("server.address"), env.getProperty("server.port"));
+            return;
+        }
+        if (job.equals("create-user")) {
+            users.createOrUpdate(env.getProperty("FISRE_USER"), env.getProperty("FISRE_PASSWORD"), env.getProperty("FISRE_ROLES"));
+            log.info("User {} saved for the rule UI", env.getProperty("FISRE_USER"));
+            return;
+        }
+        if (job.equals("export-rules")) {
+            String dir = env.getProperty("FISRE_EXPORT_DIR", "build/exported-rules");
+            log.info("Exported {} rule file(s) to {}", exporter.export(java.nio.file.Path.of(dir)).size(), dir);
             return;
         }
         if (job.equals("health")) {
@@ -160,7 +185,7 @@ public class JobRunner implements ApplicationRunner {
         }
         String batchId = props.batchId();
         if (!java.util.Set.of("promote", "clean", "reopen").contains(job)) {
-            throw new IllegalArgumentException("Unknown fisre.job '" + job + "' (expected none, health, promote, promote-loaded, clean, reopen, load-rules, detect, retain, generate, nightly, confirm-delivery, import-confirmations or resolve-rejection)");
+            throw new IllegalArgumentException("Unknown fisre.job '" + job + "' (expected none, health, promote, promote-loaded, clean, reopen, load-rules, detect, retain, generate, nightly, confirm-delivery, import-confirmations, resolve-rejection, serve, create-user or export-rules)");
         }
         if (batchId == null || batchId.isBlank()) {
             throw new IllegalArgumentException("fisre.job=" + job + " needs fisre.batch-id (FISRE_BATCH_ID)");

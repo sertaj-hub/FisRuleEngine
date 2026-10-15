@@ -1,7 +1,7 @@
 # PostgreSQL is the only vendor built and tested for now (ADR-0002); the Dialect seam keeps others possible.
 fisre:
   db-vendor: ${FISRE_DB_VENDOR:postgresql}
-  job: ${FISRE_JOB:none}                     # none | promote | promote-loaded | clean | reopen | load-rules | detect | retain | generate | nightly | health | confirm-delivery | import-confirmations | resolve-rejection
+  job: ${FISRE_JOB:none}                     # none | promote | promote-loaded | clean | reopen | load-rules | detect | retain | generate | nightly | health | confirm-delivery | import-confirmations | resolve-rejection | serve | create-user | export-rules
   batch-id: ${FISRE_BATCH_ID:}               # required by promote, clean, reopen
   business-date: ${FISRE_BUSINESS_DATE:}     # YYYY-MM-DD, required by detect, retain, generate
   rules-dir: ${FISRE_RULES_DIR:specs/rules}  # rule specs read by load-rules
@@ -43,7 +43,7 @@ fisre:
 
 spring:
   main:
-    web-application-type: none
+    web-application-type: ${FISRE_WEB_TYPE:none}      # FISRE_JOB=serve switches this to servlet automatically (FisreApplication)
   datasource:
     url: ${FISRE_DB_URL:jdbc:postgresql://localhost:5432/fisre}
     username: ${FISRE_DB_USER:fisre}
@@ -57,3 +57,10 @@ spring:
       stg: ${fisre.schemas.stg}
       mst: ${fisre.schemas.mst}
       aml: ${fisre.schemas.aml}
+
+server:
+  address: ${FISRE_WEB_BIND:127.0.0.1}     # the rule UI listens on localhost unless told otherwise; put TLS in front
+  port: ${FISRE_WEB_PORT:8080}
+  error:
+    include-message: never
+    include-stacktrace: never
